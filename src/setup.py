@@ -339,8 +339,66 @@ def map_equation_wrapper(G, partition):
 # cnm_partition_map = extract_partition_map(communities)
 # map_equation_wrapper(G, cnm_partition_map)
 # map_equation_wrapper(G, true_partition_map)
+#%%
+def map_equation_wrapper(G, partition):
+    # adjacency_matrix = nx.adjacency_matrix(G)
+    # left_eigs = scipy.linalg.eig(adjacency_matrix.A, left=True)
+    # print(adjacency_matrix.A)
+    # print(left_eigs[0])
+    numerical_stabilizer = np.finfo(float).eps
+    transition_matrix = nx.algorithms.google_matrix(G)
+    initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
+    A = transition_matrix.T
+    eigen_vector = initial_starting_point
+    for k in range(1000):
+        normalizer = np.linalg.norm(A * eigen_vector)
+        eigen_vector = A * eigen_vector / normalizer
+        # print(f"{k}. iteration")
+        # print(b_k)
+        # print(normalizer)
+    stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector)).squeeze()
+    # print(stationary_node_distribution)
+    eigen_value = normalizer + numerical_stabilizer
+    community_map = extract_community_map(partition)
+    # print(community_map)
 
+    adjacent_nodes_per_node = {
+        node : (partition[node],[partition[adjacent_node] for adjacent_node in G[node]]) 
+        for idx, module in enumerate(community_map) 
+        for node in module
+    }
+    num_partitions = max(set(partition.values()))+1
+    partition_exit_links = np.zeros(num_partitions)
+    partition_links_sums = np.zeros(num_partitions)
+    partition_probabilities = np.zeros(num_partitions)
+    for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items():
+        partition_exit_links[node_partition] += sum(node_partition != np.array(neighbor_partitions)) 
+        partition_links_sums[node_partition] += len(neighbor_partitions)
+        partition_probabilities[node_partition] += stationary_node_distribution[node]
+    # tmp = {node:(sum([partition[node] != partition[neighbor] for neighbor in adj]))  for node, adj in adjacent_nodes_per_node.items()}
+    # tmp2 = {len(adj) for node, adj in adjacent_nodes_per_node.items()}
+    # partition_exit_prob = {}
+    # for node, prob in tmp.items():
+    #     partition_exit_prob[partition[node]] = partition_exit_prob.setdefault(partition[node], 0) + prob
+    partition_exit_prob = np.nan_to_num(partition_exit_links/partition_links_sums)
+    node_exit_prob = {node: sum(node_partition != np.array(neighbor_partitions)) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
 
+    q_out = partition_exit_prob.sum()
+    q_i_out = partition_exit_prob 
+    p_i_in = partition_probabilities
+    denominator = p_i_in + q_i_out
+    p_i_out_sum_p_i = stationary_node_distribution
+
+    H_Q = - (q_i_out/q_out).dot(np.nan_to_num(np.log2(q_i_out/q_out)))
+    H_P_i = - np.nan_to_num(q_i_out/denominator) * np.nan_to_num(np.log2(q_i_out/denominator)) - np.nan_to_num(p_i_in/denominator) * np.nan_to_num(np.log2(p_i_in/denominator))
+
+    print(q_out, H_Q)
+    print(denominator)
+    print(H_P_i)
+    # print(q_out * H_Q)
+    L = q_out * H_Q + denominator.dot(H_P_i)
+    L = np.asarray(L).flatten()[0]
+    return L
 # %%
 from infomap import Infomap
 from collections import defaultdict 
@@ -349,7 +407,6 @@ from collections import defaultdict
 g1 = nx.karate_club_graph()
 name_map = nx.get_node_attributes(g1, 'club')
 coms_to_node = defaultdict(list)
-print(name_map)
 
 im = Infomap()
 for e in g1.edges():
