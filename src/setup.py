@@ -258,7 +258,7 @@ def map_equation_wrapper(G, partition):
     numerical_stabilizer = np.finfo(float).eps
     transition_matrix = nx.algorithms.google_matrix(G)
     initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
-    A = transition_matrix.T
+    A = transition_matrix.T + numerical_stabilizer
     eigen_vector = initial_starting_point
     for k in range(1000):
         normalizer = np.linalg.norm(A * eigen_vector)
@@ -383,12 +383,12 @@ from collections import defaultdict
 # g = convert_graph_formats(g_original, nx.Graph)
 
 # G = nx.karate_club_graph()
-# G = nx.barbell_graph(5, 1)
+G = nx.barbell_graph(6, 1)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(2,50, p_in=0.6, p_out=0.01)
-G, pos = generate_benchmark_graph(250,0.1)
+# G, pos = generate_benchmark_graph(250,0.1)
 
 
 pos = nx.spring_layout(G)
