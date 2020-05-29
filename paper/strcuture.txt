@@ -1,0 +1,6 @@
+0. Abstract 1 Column
+1. Introduction - 1 Column
+2. Experimental Setup (Benchmark, Metric, Algorithm) 2-3 Columns
+3. Models 2 Columns
+4. Tests (Results) <--- 2-3
+5. Summary 1 Columns

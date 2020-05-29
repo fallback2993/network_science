@@ -61,7 +61,7 @@ def extract_partition_map(communities):
 def extract_community_map(partition):
     v = {}
     for key, value in partition.items():
-        v.setdefault(value, set()).add(key)
+        v.setdefault(value, []).append(key)
     communities = list(dict(sorted(v.items())).values())
     return communities
 
@@ -274,10 +274,12 @@ def map_equation_wrapper(G, partition):
         for idx, module in enumerate(community_map) 
         for node in module
     }
+    adjacent_nodes_per_node = dict(sorted(adjacent_nodes_per_node.items()))
+    print(adjacent_nodes_per_node)
     # print(adjacent_nodes_per_node)
     node_relative_weight = {node: len(neighbor_partitions)/(2*num_links) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
-    node_relative_weight = dict(sorted(node_relative_weight.items())) # No real need
-    # print(node_relative_weight)
+    node_exit_probability = {node: sum(node_partition != np.array(neighbor_partitions))/len(neighbor_partitions) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
+    # print(node_exit_probability)
 
     num_partitions = len(community_map)
     partition_ex_links = np.zeros(num_partitions)
@@ -293,15 +295,25 @@ def map_equation_wrapper(G, partition):
         # partition_relative_weights_exiting[node_partition] += []
 
     
-    partition_links = ((partition_in_links/2)+partition_ex_links)
+    partition_links = ((partition_in_links)+partition_ex_links)
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)
-    # partition_ex_relative_weights = 
+    
+    tmp = np.array(list(node_exit_probability.values())) * stationary_node_distribution
+
+    tmp2 = np.array([sum(tmp[community]) for community in community_map])
+
+
+    partition_ex_rel_to_partition_links_normalized = np.nan_to_num(partition_ex_links/(partition_in_links + partition_ex_links))/num_partitions
+    print(tmp2.shape)
+    print(partition_ex_rel_to_partition_links_normalized.shape)
 
     print(pd.DataFrame([
             partition_ex_links,
             partition_in_links, 
             partition_in_links + partition_ex_links,
-            partition_ex_links/(partition_in_links + partition_ex_links), 
+            partition_ex_links/(partition_in_links + partition_ex_links),
+            partition_ex_rel_to_partition_links_normalized,
+            tmp2,
             partition_exit_prob,
             partition_probabilities, 
             partition_relative_weights
@@ -311,6 +323,8 @@ def map_equation_wrapper(G, partition):
             "partition_in_links", 
             "partition_total_links",
             "partition_ex_rel_to_partition_links",
+            "partition_ex_rel_to_partition_links_norm",
+            "alternative",
             "partition_exit_prob" ,
             "partition_probabilities", 
             "partition_relative_weights"
@@ -321,7 +335,8 @@ def map_equation_wrapper(G, partition):
     
     print("")
     p_a_i = partition_probabilities
-    q_out_i = np.nan_to_num(partition_ex_links/(partition_in_links + partition_ex_links))/num_partitions
+    q_out_i = tmp2
+    q_out_i = partition_ex_rel_to_partition_links_normalized
     q_out = q_out_i.sum()
     H_Q = - sum(np.nan_to_num((q_out_i/q_out) * np.log2(q_out_i/q_out)))
     # p_circle = np.array([
@@ -341,7 +356,7 @@ def map_equation_wrapper(G, partition):
         return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
     
     term2 = -np.array([
-        compute_weighted_entropy(node_relative_weight[list(community)], p_circle_i[i]) 
+        compute_weighted_entropy(node_relative_weight[community], p_circle_i[i]) 
         for i, community 
         in enumerate(community_map)
         ])
@@ -367,7 +382,7 @@ def map_equation_wrapper(G, partition):
     print(f"H_P_i:{H_P_i}")
     print(f"{L} = {q_out * H_Q} + {p_circle_i.dot(H_P_i)}")
     
-    return L
+    return -L
 
 
 # # %%
@@ -382,8 +397,8 @@ from infomap import Infomap
 from collections import defaultdict 
 # g = convert_graph_formats(g_original, nx.Graph)
 
-# G = nx.karate_club_graph()
-G = nx.barbell_graph(6, 1)
+G = nx.karate_club_graph()
+G = nx.barbell_graph(5, 1)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
