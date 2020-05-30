@@ -88,8 +88,8 @@ class GCM():
         
         new_random_population = list(self.initialization(G, G.nodes()).values())
         return dict(enumerate(
-                (beta_population + new_population)[:int(len(population)*0.9)]
-                + new_random_population[:int(len(population)*0.1)]
+                (beta_population + new_population)[:int(len(population)*0.8)]
+                + new_random_population[:int(len(population)*0.2)]
             ))
 
 
