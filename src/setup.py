@@ -268,7 +268,6 @@ def performance_wrapper(partition, G):
 
 performance_wrapper(lpa_partition_map, G)
 # %%
-from infomap import Infomap
 
 def map_equation(G, partition):
     def compute_weighted_entropy(probs, normalizer):
@@ -289,10 +288,6 @@ def map_equation(G, partition):
             break
     stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector)).squeeze()
     eigen_value = normalizer  # numerical_stabilizer
-    # print(eigen_value)
-    # print(np.array(eigen_vector/sum(eigen_vector)).squeeze())
-
-    old_old = stationary_node_distribution
     
     community_map = dict(enumerate(extract_community_map(partition))) # For some reason partition zero misses
     num_links = len(G.edges())
@@ -310,17 +305,10 @@ def map_equation(G, partition):
             adjacent_partition_matrix[node][node] = partition[node]
             for adjacent_node in G[node]:
                 adjacent_partition_matrix[node][adjacent_node] = partition[adjacent_node]
-    # adjacent_partition_matrix = adjacent_partition_matrix+1
     diagonal = np.diagonal(adjacent_partition_matrix)
-    # print(adjacent_partition_matrix)
-    # print(diagonal)
+
     zm = np.ma.masked_where(np.isnan(adjacent_partition_matrix), adjacent_partition_matrix)
     apm_linkage = zm == diagonal[:, None]
-    # print(apm_linkage==True)
-    # print(np.unique(diagonal))
-    # print(np.where(diagonal == np.unique(diagonal)[0]))
-    # print(np.sum(apm_linkage==True, axis=1)-1)
-    # print(np.sum(apm_linkage==False, axis=1))
 
     num_partitions = np.max(list(partition.values())) + 1
     partition_ex_links = np.zeros(num_partitions)
@@ -332,62 +320,19 @@ def map_equation(G, partition):
     for partition in np.unique(diagonal):
         partition = int(partition)
         indices_to_check = list(np.where(diagonal == partition)[0])
-        
-        # print(indices_to_check)
-        sum_of_in_links = node_partition_in_links[indices_to_check].sum()
-        sum_of_ex_links = node_partition_ex_links[indices_to_check].sum()
-        # print(sum_of_ex_links)
-        # print(sum_of_in_links)
-        # print(partition)
         partition_ex_links[partition] = sum(node_partition_ex_links[indices_to_check])
         partition_in_links[partition] = sum(node_partition_in_links[indices_to_check])
 
-    # node_relative_weight = np.zeros(len(G.nodes()), dtype=np.longdouble)
-    # node_relative_weight[:] = (np.count_nonzero(np.isfinite(adjacent_partition_matrix), axis=1)-1).astype('longdouble')/(2*np.float(num_links))
-    # # node_relative_weight = node_relative_weight/node_relative_weight.sum()
-    # new_ = node_relative_weight
-    # print(node_relative_weight)
-
-    # print(adjacent_partition_matrix)
-    # print(num_links)
-    # print((np.count_nonzero(np.isfinite(adjacent_partition_matrix), axis=1)).astype('longdouble'))
-
-
-    print("")
-    # print(node_relative_weight)
-    # print(zm == 2)
-    # print(np.isfinite(adjacent_partition_matrix))
-
     adjacent_nodes_per_node = dict(sorted(adjacent_nodes_per_node.items()))
-    # relative_weight_of_node = {node: len(neighbor_partitions)/(2*num_links) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
-
-    # partition_ex_links = np.zeros(num_partitions)
-    # partition_in_links = np.zeros(num_partitions)
-
-    # for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items():
-    #     partition_ex_links[node_partition] += sum(node_partition != np.array(neighbor_partitions)) 
-    #     partition_in_links[node_partition] += sum(node_partition == np.array(neighbor_partitions))     
-    
-    # print(partition_in_links)
-    # print(partition_ex_links)
 
     partition_probabilities = np.zeros(num_partitions)
     partition_links = (partition_in_links+partition_ex_links)
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
-    # node_relative_weight = np.array(list(relative_weight_of_node.values()))
-    
-    # old_ = node_relative_weight
-
-    # print(f"Off by {old_old.sum()} <-> {new_.sum()} <-> {old_.sum()}")
 
     node_relative_weight = stationary_node_distribution
-    # print(np.where(new_ != old_)[0])
-    # print(new_[np.where(new_ != old_)[0]])
-    # print(old_[np.where(new_ != old_)[0]])
-    
+
     for name, community in community_map.items():
         partition_probabilities[name] = sum(node_relative_weight[community])
-
 
     p_a_i = partition_probabilities
     q_out_i = partition_exit_prob
@@ -412,25 +357,8 @@ def map_equation_wrapper(partition, G):
     return -L
 
 
-G, pos = generate_benchmark_graph(500,0.1)
-# G = nx.barbell_graph(5, 2)
-# G = nx.bull_graph()
-# G = generator.planted_partition_graph(4, 40, p_in=0.6, p_out=0.1)
-# G = generator.random_partition_graph([50,50,30,30,50,10,10,10,10], p_in=0.9, p_out=0.01)
-# G = nx.generators.cubical_graph()
-
-im = Infomap()
-for e in G.edges():
-    im.addLink(e[0], e[1])
-im.run()
-
-print(f"Found {im.num_top_modules} modules with codelength: {im.codelength}")
-print("\n#node module")
-result = {node.node_id: node.module_id-1 for node in im.tree if node.is_leaf}
-infomap_partition = dict(sorted(result.items())) 
-pos = nx.spring_layout(G)
-print(f"{map_equation_wrapper(dict(infomap_partition), G)} : {im.codelengths[0]}")
-visualize_benchmark_graph(G,pos, infomap_partition)
+G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
+map_equation_wrapper(dict(community_louvain.best_partition(G)), G)
 
 # %%
 
