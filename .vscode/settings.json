@@ -1,3 +1,17 @@
 {
+
+    // to use ms python language server
+    "python.jediMemoryLimit":1,
+    "python.jediEnabled": false,
+    "python.linting.ignorePatterns": [
+        "${workspaceFolder}/vendor"
+    ],
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "${workspaceFolder}/src/vendor/*": true,
+        "**/*.code-search": true
+    },
+    // "python.auto"
     "python.pythonPath": "C:\\Users\\ohund\\Anaconda3\\envs\\ds\\python.exe"
 }

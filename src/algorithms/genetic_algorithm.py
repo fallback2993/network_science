@@ -9,7 +9,7 @@ from community import modularity
 class GCM():
 
     def __init__(self, iterations=50, pop_size=42, alpha=0.4, theta=0.2, xi=0.5, beta=0.1,
-                 fitness_func=modularity):
+                 fitness_func=modularity, verbose = False):
         self.iterations     = iterations
         self.pop_size       = pop_size
         self.alpha          = alpha
@@ -17,6 +17,7 @@ class GCM():
         self.xi             = xi
         self.beta           = beta
         self.fitness_func   = fitness_func
+        self.verbose   = verbose
     
     def convert_to_sequence(self, partition):
         communities_dict = defaultdict(list)
@@ -103,12 +104,13 @@ class GCM():
 
         population = self.initialization(G, nodes)
         for i in range(self.iterations):
-            if i % 10 == 0:
-                # print(f"POPULATION: {population[0]}")
-                # print(f"STEP: {i}")
-                partition = dict(enumerate(population[0]))
-                print(f"MODULARITY: {modularity(partition, G)}")
-                print(f"{self.fitness_func.__name__}: {self.fitness_func(partition, G)}")
+            if self.verbose:
+                if i % 10 == 0:
+                    # print(f"POPULATION: {population[0]}")
+                    # print(f"STEP: {i}")
+                    partition = dict(enumerate(population[0]))
+                    print(f"MODULARITY: {modularity(partition, G)}")
+                    print(f"{self.fitness_func.__name__}: {self.fitness_func(partition, G)}")
 
             population = self.get_next_generation(G, population)
         
