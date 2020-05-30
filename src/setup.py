@@ -55,6 +55,7 @@ def extract_true_communities(G):
     return partition, communities
 
 def extract_partition_map(communities):
+    # print(communities)
     node_community_participation = {node:idx for idx, community in enumerate(communities) for node in community}
     return OrderedDict(sorted(node_community_participation.items()))
 
@@ -250,13 +251,31 @@ draw_plots(data)
 # %%
 def modularity_wrapper(G, partition):
     return community_louvain.modularity(partition, G)
-
+    
 modularity_wrapper(G, lpa_partition_map)
-# %%
-def map_equation_wrapper(G, partition):
 
+# %%
+def coverage_wrapper(G, partition):
+    community_map = extract_community_map(partition)
+    return algorithms.coverage(G, community_map)
+
+coverage_wrapper(G, lpa_partition_map)
+
+# %%
+def performance_wrapper(G, partition):
+    community_map = extract_community_map(partition)
+    return algorithms.performance(G, community_map)
+
+performance_wrapper(G, lpa_partition_map)
+# %%
+def map_equation(G, partition):
+
+
+    # print(type(G))
+    # print(partition)
     numerical_stabilizer = np.finfo(float).eps
     transition_matrix = nx.algorithms.google_matrix(G)
+    
     initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
     A = transition_matrix.T + numerical_stabilizer
     eigen_vector = initial_starting_point
@@ -265,179 +284,136 @@ def map_equation_wrapper(G, partition):
         eigen_vector = A * eigen_vector / normalizer
     stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector)).squeeze()
     eigen_value = normalizer + numerical_stabilizer
-    community_map = extract_community_map(partition) # For some reason partition zero misses
+    community_map = dict(enumerate(extract_community_map(partition))) # For some reason partition zero misses
+    # new_partition = extract_partition_map(community_map)
     num_links = len(G.edges())
-    # print(community_map)
 
     adjacent_nodes_per_node = {
         node : (partition[node],[partition[adjacent_node] for adjacent_node in G[node]]) 
-        for idx, module in enumerate(community_map) 
-        for node in module
+        for name, community in community_map.items() 
+        for node in community
     }
-    adjacent_nodes_per_node = dict(sorted(adjacent_nodes_per_node.items()))
-    print(adjacent_nodes_per_node)
+    # print(partition)
+    # print(new_partition)
     # print(adjacent_nodes_per_node)
-    node_relative_weight = {node: len(neighbor_partitions)/(2*num_links) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
-    node_exit_probability = {node: sum(node_partition != np.array(neighbor_partitions))/len(neighbor_partitions) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
-    # print(node_exit_probability)
+    adjacent_nodes_per_node = dict(sorted(adjacent_nodes_per_node.items()))
+    relative_weight_of_node = {node: len(neighbor_partitions)/(2*num_links) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
 
-    num_partitions = len(community_map)
+    num_partitions = np.max(list(partition.values())) + 1
+    # num_partitions = len(community_map)
+    # print(len(partition), len(community_map))
     partition_ex_links = np.zeros(num_partitions)
     partition_in_links = np.zeros(num_partitions)
     partition_probabilities = np.zeros(num_partitions)
-    partition_relative_weights = np.zeros(num_partitions)
-    partition_relative_weights_exiting = np.zeros(num_partitions)
     for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items():
         partition_ex_links[node_partition] += sum(node_partition != np.array(neighbor_partitions)) 
-        partition_in_links[node_partition] += sum(node_partition == np.array(neighbor_partitions)) 
-        partition_probabilities[node_partition] += stationary_node_distribution[node]
-        partition_relative_weights[node_partition] += node_relative_weight[node]
-        # partition_relative_weights_exiting[node_partition] += []
-
+        partition_in_links[node_partition] += sum(node_partition == np.array(neighbor_partitions))     
+    partition_links = (partition_in_links+partition_ex_links)
+    partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
+    node_relative_weight = np.array(list(relative_weight_of_node.values()))
     
-    partition_links = ((partition_in_links)+partition_ex_links)
-    partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)
-    
-    tmp = np.array(list(node_exit_probability.values())) * stationary_node_distribution
+    for name, community in community_map.items():
+        partition_probabilities[name] = sum(node_relative_weight[community])
 
-    tmp2 = np.array([sum(tmp[community]) for community in community_map])
+    def compute_weighted_entropy(probs, normalizer):
+        # print(probs)
+        return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
+    # print("")
 
-
-    partition_ex_rel_to_partition_links_normalized = np.nan_to_num(partition_ex_links/(partition_in_links + partition_ex_links))/num_partitions
-    print(tmp2.shape)
-    print(partition_ex_rel_to_partition_links_normalized.shape)
-
-    print(pd.DataFrame([
-            partition_ex_links,
-            partition_in_links, 
-            partition_in_links + partition_ex_links,
-            partition_ex_links/(partition_in_links + partition_ex_links),
-            partition_ex_rel_to_partition_links_normalized,
-            tmp2,
-            partition_exit_prob,
-            partition_probabilities, 
-            partition_relative_weights
-            ], 
-        index=[
-            "partition_ex_links", 
-            "partition_in_links", 
-            "partition_total_links",
-            "partition_ex_rel_to_partition_links",
-            "partition_ex_rel_to_partition_links_norm",
-            "alternative",
-            "partition_exit_prob" ,
-            "partition_probabilities", 
-            "partition_relative_weights"
-            ]))
-    # node_exit_prob = {node: sum(node_partition != np.array(neighbor_partitions)) for node, (node_partition, neighbor_partitions) in adjacent_nodes_per_node.items()}
-
-    node_relative_weight = np.array(list(node_relative_weight.values()))
-    
-    print("")
     p_a_i = partition_probabilities
-    q_out_i = tmp2
-    q_out_i = partition_ex_rel_to_partition_links_normalized
+    q_out_i = partition_exit_prob
     q_out = q_out_i.sum()
     H_Q = - sum(np.nan_to_num((q_out_i/q_out) * np.log2(q_out_i/q_out)))
-    # p_circle = np.array([
-    #     sum(node_relative_weight[list(community)]+q_out_i[i]) 
-    #     for i, community 
-    #     in enumerate(community_map)
-    #     ]) 
     p_circle_i = p_a_i + q_out_i
-    # print((q_out_i/p_circle))
-    # print(np.log2((q_out_i/p_circle)))
-    # print((q_out_i/p_circle)*np.log2((q_out_i/p_circle)))
-    # print(-np.nan_to_num((q_out_i/p_circle)*np.log2((q_out_i/p_circle))))
-
     term1 = -np.nan_to_num((q_out_i/p_circle_i)*np.log2((q_out_i/p_circle_i)))
-    # term2 = -sum(np.nan_to_num((p_a_i/p_circle) * np.log2(p_a_i/p_circle)))
-    def compute_weighted_entropy(probs, normalizer):
-        return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
-    
-    term2 = -np.array([
-        compute_weighted_entropy(node_relative_weight[community], p_circle_i[i]) 
-        for i, community 
-        in enumerate(community_map)
-        ])
-
-    # print(node_relative_weight)
-    # print(node_relative_weight[list(community_map[0])])
-    # print(node_relative_weight * np.log2(node_relative_weight))
-    # print(np.nansum(node_relative_weight * np.log2(node_relative_weight)))
-    # print(term2)
-
-
+    # print(community_map.keys())
+    # print(len(community_map))
+    # term2 = -np.array([
+    #     compute_weighted_entropy(node_relative_weight[community_map[idx]], p_circle_i[idx]) 
+    #     for idx
+    #     in range(num_partitions)
+    # ])
+    term2 = np.zeros(num_partitions)
+    for name, community in community_map.items():
+        term2[name] = -compute_weighted_entropy(node_relative_weight[community], p_circle_i[name])
     H_P_i = term1 + term2
-    L = q_out * H_Q  + p_circle_i.dot(H_P_i)
+    index_codelength = q_out * H_Q 
+    module_codelength = p_circle_i.dot(H_P_i)
+    L = index_codelength + module_codelength 
     L = np.asarray(L).flatten()[0]
-    print("")
-    # print(f"p_a_i:{p_a_i}")
-    # print(f"q_out_i:{q_out_i}")
-    print(f"q_out:{q_out}")
-    print(f"H_Q:{H_Q}")
-    print(f"p_circle_i:{p_circle_i}")
-    # print(f"term1:{term1}")
-    # print(f"term2:{term2}")
-    print(f"H_P_i:{H_P_i}")
-    print(f"{L} = {q_out * H_Q} + {p_circle_i.dot(H_P_i)}")
     
+    return L, index_codelength, module_codelength
+
+def map_equation_wrapper(partition, G):
+    L, index_codelength, module_codelength = map_equation(G, partition) 
     return -L
 
+G, pos = generate_benchmark_graph(250,0.1)
+prt = community_louvain.best_partition(G)
+map_equation_wrapper(dict(prt), G)
+# G = nx.barbell_graph(5, 1)
 
-# # %%
-# G = nx.karate_club_graph()
-# true_partition_map = community_louvain.best_partition(G)
-# communities = algorithms.greedy_modularity_communities(G)
-# cnm_partition_map = extract_partition_map(communities)
-# map_equation_wrapper(G, cnm_partition_map)
-# map_equation_wrapper(G, true_partition_map)
+# genetic_algorithm = GCM(100, 25, fitness_func=map_equation_wrapper)
+# gcm_partition_map_ME, gcm_community_map_ME = genetic_algorithm.gcm(G)
 
+# %%
+
+# %%
 from infomap import Infomap
 from collections import defaultdict 
 # g = convert_graph_formats(g_original, nx.Graph)
 
 G = nx.karate_club_graph()
 G = nx.barbell_graph(5, 1)
-# G = nx.bull_graph()
-# G = nx.generators.erdos_renyi_graph(10, 0.5)
-# G = nx.generators.cubical_graph()
-# G = generator.planted_partition_graph(2,50, p_in=0.6, p_out=0.01)
-# G, pos = generate_benchmark_graph(250,0.1)
+G = nx.bull_graph()
+G = nx.generators.erdos_renyi_graph(10, 0.5)
+G = nx.generators.cubical_graph()
+G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
+G, pos = generate_benchmark_graph(500,0.1)
 
 
 pos = nx.spring_layout(G)
-# name_map = nx.get_node_attributes(g1, 'club')
-# coms_to_node = defaultdict(list)
-
 im = Infomap()
 for e in G.edges():
     im.addLink(e[0], e[1])
 im.run()
 
-# for node in im.iterTree():
-#     if node.isLeaf():
-#         nid = node.physicalId
-#         module = node.moduleIndex()
-        # nm = name_map[nid]
-        # coms_to_node[module].append(nm)
-
-# coms_infomap = [list(c) for c in coms_to_node.values()]
-im.codelengths
 print(f"Found {im.num_top_modules} modules with codelength: {im.codelength}")
-
 print("\n#node module")
 result = {node.node_id: node.module_id-1 for node in im.tree if node.is_leaf}
 infomap_partition = dict(sorted(result.items())) 
-# infomap_partition = dict(enumerate(infomap_partition.keys()))
 
-my_codelength = map_equation_wrapper(G, infomap_partition)
+codelength, index_codelength, module_codelength = map_equation(G, infomap_partition)
 
 print("")
 print("Result")
-print(f"Calculated {my_codelength}")
+print(f"Calculated {codelength} = {im.index_codelength} + {im.module_codelength}")
 print(f"Correct is {im.codelengths[0]} = {im.index_codelength} + {im.module_codelength}")
+print(im.codelengths[0]-codelength)
 visualize_benchmark_graph(G, pos, infomap_partition)
 
+
+# %%
+from algorithms.genetic_algorithm import GCM
+G, pos = generate_benchmark_graph(500,0.1)
+
+genetic_algorithm = GCM(100, 25, fitness_func=community_louvain.modularity)
+gcm_partition_map, gcm_community_map = genetic_algorithm.gcm(G)
+visualize_benchmark_graph(G, pos, gcm_partition_map)
+
+genetic_algorithm = GCM(100, 10, fitness_func=map_equation_wrapper)
+gcm_partition_map_ME, gcm_community_map_ME = genetic_algorithm.gcm(G)
+visualize_benchmark_graph(G, pos, gcm_partition_map_ME)
+
+# %%
+true_partition_map, communities = extract_true_communities(G)
+print(
+    normalized_mutual_information(true_partition_map, gcm_partition_map),
+    normalized_mutual_information(true_partition_map, gcm_partition_map_ME),
+    normalized_mutual_information(true_partition_map, infomap_partition),
+)
+
+
+# %%
 
 # %%
