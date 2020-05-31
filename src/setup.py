@@ -84,7 +84,8 @@ def visualize_benchmark_graph(G, pos, partition = None, ax=None):
         nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
     return None
 
-    
+def sort_partition_map(partition_map):
+    return dict(sorted(partition_map.items()))    
     # return nx.draw_networkx(G, 
     # pos, 
     # edge_color="black", 
@@ -475,7 +476,7 @@ class LouvainAlgorithm:
         result = self.run_iteration(G, initial_partition_map)
         if self.verbose:
             print(f"Final results are in! Algorithm found {len(np.unique(list(result.values())))} communities")
-        backtracked_partitioning = self.decode_partition_map(len(self.levels))
+        backtracked_partitioning = self.decode_partition_map(len(self.levels)-1)
         return backtracked_partitioning
 
     def run_iteration(self, G, initial_partition_map):
@@ -563,19 +564,22 @@ class LouvainAlgorithm:
         return tmp_G, new_partition_map
     
     def decode_partition_map(self, starting_level):
-        return self._decode_levels(starting_level-1, self.levels[starting_level-1])
+        if starting_level <= 1:
+            return self.levels[0]
+        result = self._decode_levels(starting_level-1, self.levels[starting_level])
+        return result
 
     def _decode_levels(self, level, subset):
         partitions_from_level = self.levels[level]
         if level == 0:
-            result = {key:partitions_from_level[key] for key in subset.keys()}
+            result = subset
             return  result
         keys = np.unique(list(subset.keys()))
         result = {}
         for key in keys:
             partition_subset = {node:comm for node, comm in partitions_from_level.items() if comm==key}
             nodes = self._decode_levels(level-1, partition_subset)
-            renamed_nodes = {node:key for node in nodes}
+            renamed_nodes = {node:key for node, prev_community in nodes.items()}
             result.update(renamed_nodes)
         # print(result)
         return result
@@ -593,33 +597,42 @@ class LouvainAlgorithm:
         communities = list(dict(sorted(v.items())).values())
         return communities
 
-G = nx.karate_club_graph()
+# G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 3)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
 # G, pos = generate_benchmark_graph(250,0.1)
+pos = nx.spring_layout(G)
+
+G, pos = generate_benchmark_graph(250,0.1)
 print("Generated network")
 
-pos = nx.spring_layout(G)
-G, pos = generate_benchmark_graph(250,0.1)
 louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20)
 my_prt = louvain_algorithm.run_louvain(G)
 true_prt = community_louvain.best_partition(G)
 
 # %%
-fig, ax = plt.subplots(4, 1)
-fig.set_size_inches(5, 20)
-visualize_benchmark_graph(G, pos, my_prt, ax[0])
-visualize_benchmark_graph(G, pos, louvain_algorithm.levels[1], ax[1])
-visualize_benchmark_graph(G, pos, louvain_algorithm.levels[2], ax[2])
-visualize_benchmark_graph(G, pos, louvain_algorithm._decode_levels(louvain_algorithm.levels[3]), ax[3])
-visualize_benchmark_graph(G, pos, true_prt, ax[-1])
-
-# %%
 true_partition_map, communities = extract_true_communities(G)
-print(f"{normalized_mutual_information(true_partition_map, my_prt)} vs. {normalized_mutual_information(true_partition_map, true_prt)}")
+
+num_plots = len(louvain_algorithm.levels)+1
+fig, ax = plt.subplots(num_plots, 1)
+fig.set_size_inches(5, 5*num_plots)
+for i in range(0,num_plots-1):
+    tmp_prt = sort_partition_map(louvain_algorithm.decode_partition_map(i))
+    ax[i].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, tmp_prt)} ", fontsize=10)
+    ax[i].set_axis_off()
+    visualize_benchmark_graph(G, pos, tmp_prt, ax[i])
+
+ax[-1].set_title(f"True Partition -> NMI: {normalized_mutual_information(true_partition_map, true_prt)}", fontsize=10)
+ax[-1].set_axis_off()
+visualize_benchmark_graph(G, pos, true_prt, ax[-1])
+# visualize_benchmark_graph(G, pos, my_prt, ax[-1])
+
+# %%
+# print(f"{normalized_mutual_information(true_partition_map, my_prt)} vs. {normalized_mutual_information(true_partition_map, true_prt)}")
 
 
 # %%
+louvain_algorithm.decode_partition_map(1)
