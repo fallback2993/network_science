@@ -565,9 +565,13 @@ class LouvainAlgorithm:
     
     def decode_partition_map(self, starting_level):
         if starting_level <= 1:
-            return self.levels[0]
+            return self._sort_partition_map(self.levels[0])
         result = self._decode_levels(starting_level-1, self.levels[starting_level])
-        return result
+
+        return self._sort_partition_map(result)
+    
+    def _sort_partition_map(self, partition_map):
+        return dict(sorted(partition_map.items()))
 
     def _decode_levels(self, level, subset):
         partitions_from_level = self.levels[level]
@@ -620,7 +624,7 @@ num_plots = len(louvain_algorithm.levels)+1
 fig, ax = plt.subplots(num_plots, 1)
 fig.set_size_inches(5, 5*num_plots)
 for i in range(0,num_plots-1):
-    tmp_prt = sort_partition_map(louvain_algorithm.decode_partition_map(i))
+    tmp_prt = louvain_algorithm.decode_partition_map(i)
     ax[i].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, tmp_prt)} ", fontsize=10)
     ax[i].set_axis_off()
     visualize_benchmark_graph(G, pos, tmp_prt, ax[i])
