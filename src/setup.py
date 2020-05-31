@@ -460,6 +460,7 @@ class LouvainAlgorithm:
     
     fitness_function = None
     levels = []
+    level_fitness = [] 
 
     def __init__(self, resolution=0.01 ,max_iter=10, fitness_function=community_louvain.modularity, verbose=False):
         self.fitness_function = fitness_function
@@ -481,12 +482,13 @@ class LouvainAlgorithm:
 
     def run_iteration(self, G, initial_partition_map):
         
-        new_partition_map = self.local_movement(G, initial_partition_map)
+        new_partition_map, final_fitness = self.local_movement(G, initial_partition_map)
         if self.verbose:
             print(f"Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
         if new_partition_map == initial_partition_map:
             return new_partition_map
         self.levels.append(new_partition_map)
+        self.level_fitness.append(final_fitness)
         # print(new_partition_map)
         # return new_partition_map
         final_partition = {}
@@ -540,7 +542,7 @@ class LouvainAlgorithm:
         print(f"Local movement completed with {initial_fitness}")      
             
 
-        return partition_map_copy
+        return partition_map_copy, initial_fitness
 
     def reduce_network(self, G, partition_map):
         communities = np.unique(list(partition_map.values()))
