@@ -248,25 +248,30 @@ def draw_plots(data):
     return plt.show()
 
 draw_plots(data)
+
+# %%
+G, pos = generate_benchmark_graph(250,0.1)
+louvain_partition_map = community_louvain.best_partition(G)
+
 # %%
 def modularity_wrapper(partition, G):
     return community_louvain.modularity(partition, G)
     
-modularity_wrapper(lpa_partition_map, G)
+modularity_wrapper(louvain_partition_map, G)
 
 # %%
 def coverage_wrapper(partition, G):
     community_map = extract_community_map(partition)
     return algorithms.coverage(G, community_map)
 
-coverage_wrapper(lpa_partition_map, G)
+coverage_wrapper(louvain_partition_map, G)
 
 # %%
 def performance_wrapper(partition, G):
     community_map = extract_community_map(partition)
     return algorithms.performance(G, community_map)
 
-performance_wrapper(lpa_partition_map, G)
+performance_wrapper(louvain_partition_map, G)
 # %%
 
 def map_equation(G, partition):
@@ -398,90 +403,183 @@ visualize_benchmark_graph(G, pos, infomap_partition)
 
 
 # %%
-from algorithms.genetic_algorithm import GCM
-G, pos = generate_benchmark_graph(500,0.1)
+# from algorithms.genetic_algorithm import GCM
+# G, pos = generate_benchmark_graph(500,0.1)
 
-genetic_algorithm = GCM(100, 10, fitness_func=community_louvain.modularity)
-gcm_partition_map, gcm_community_map = genetic_algorithm.gcm(G)
+# genetic_algorithm = GCM(100, 10, fitness_func=community_louvain.modularity)
+# gcm_partition_map, gcm_community_map = genetic_algorithm.gcm(G)
 
-genetic_algorithm = GCM(100, 10, fitness_func=map_equation_wrapper)
-gcm_partition_map_ME, gcm_community_map_ME = genetic_algorithm.gcm(G)
+# genetic_algorithm = GCM(100, 10, fitness_func=map_equation_wrapper)
+# gcm_partition_map_ME, gcm_community_map_ME = genetic_algorithm.gcm(G)
 
-genetic_algorithm = GCM(100, 10, fitness_func=coverage_wrapper)
-gcm_partition_map_C, gcm_community_map_C = genetic_algorithm.gcm(G)
+# genetic_algorithm = GCM(100, 10, fitness_func=coverage_wrapper)
+# gcm_partition_map_C, gcm_community_map_C = genetic_algorithm.gcm(G)
 
 # genetic_algorithm = GCM(100, 10, fitness_func=performance_wrapper)
 # gcm_partition_map_P, gcm_community_map_P = genetic_algorithm.gcm(G)
 
 # %%
-true_partition_map, communities = extract_true_communities(G)
+# true_partition_map, communities = extract_true_communities(G)
 
-fig, ax = plt.subplots(3, 2)
-fig.suptitle("NMI values")
-fig.set_size_inches(10, 10)
-ax[0][0].set_title(f"Initial Graph", fontsize=10)
-ax[0][0].set_axis_off()
-ax[0][1].set_title(f"Ground-Truth: {normalized_mutual_information(true_partition_map, true_partition_map)}" , fontsize=10)
-ax[0][1].set_axis_off()
-ax[1][0].set_title(f"Modularity: {normalized_mutual_information(true_partition_map, gcm_partition_map)}" , fontsize=10)
-ax[1][0].set_axis_off()
-ax[1][1].set_title(f"Map-Equation: {normalized_mutual_information(true_partition_map, gcm_partition_map_ME)}" , fontsize=10)
-ax[1][1].set_axis_off()
-ax[2][0].set_title(f"Coverage: {normalized_mutual_information(true_partition_map, gcm_partition_map_C)}" , fontsize=10)
-ax[2][0].set_axis_off()
-ax[2][1].set_title(f"Nothing", fontsize=10)
-ax[2][1].set_axis_off()
-visualize_benchmark_graph(G, pos, None, ax[0][0])
-visualize_benchmark_graph(G, pos, true_partition_map, ax[0][1])
-visualize_benchmark_graph(G, pos, gcm_partition_map, ax[1][0])
-visualize_benchmark_graph(G, pos, gcm_partition_map_ME, ax[1][1])
-visualize_benchmark_graph(G, pos, gcm_partition_map_C, ax[2][0])
-plt.tight_layout()
-plt.show()
+# fig, ax = plt.subplots(3, 2)
+# fig.suptitle("NMI values")
+# fig.set_size_inches(10, 10)
+# ax[0][0].set_title(f"Initial Graph", fontsize=10)
+# ax[0][0].set_axis_off()
+# ax[0][1].set_title(f"Ground-Truth: {normalized_mutual_information(true_partition_map, true_partition_map)}" , fontsize=10)
+# ax[0][1].set_axis_off()
+# ax[1][0].set_title(f"Modularity: {normalized_mutual_information(true_partition_map, gcm_partition_map)}" , fontsize=10)
+# ax[1][0].set_axis_off()
+# ax[1][1].set_title(f"Map-Equation: {normalized_mutual_information(true_partition_map, gcm_partition_map_ME)}" , fontsize=10)
+# ax[1][1].set_axis_off()
+# ax[2][0].set_title(f"Coverage: {normalized_mutual_information(true_partition_map, gcm_partition_map_C)}" , fontsize=10)
+# ax[2][0].set_axis_off()
+# ax[2][1].set_title(f"Nothing", fontsize=10)
+# ax[2][1].set_axis_off()
+# visualize_benchmark_graph(G, pos, None, ax[0][0])
+# visualize_benchmark_graph(G, pos, true_partition_map, ax[0][1])
+# visualize_benchmark_graph(G, pos, gcm_partition_map, ax[1][0])
+# visualize_benchmark_graph(G, pos, gcm_partition_map_ME, ax[1][1])
+# visualize_benchmark_graph(G, pos, gcm_partition_map_C, ax[2][0])
+# plt.tight_layout()
+# plt.show()
 # visualize_benchmark_graph(G, pos, gcm_partition_map_ME)
 
 # %%
-print(
-    normalized_mutual_information(true_partition_map, gcm_partition_map),
-    normalized_mutual_information(true_partition_map, gcm_partition_map_ME),
-    normalized_mutual_information(true_partition_map, infomap_partition),
-)
+# print(
+#     normalized_mutual_information(true_partition_map, gcm_partition_map),
+#     normalized_mutual_information(true_partition_map, gcm_partition_map_ME),
+#     normalized_mutual_information(true_partition_map, infomap_partition),
+# )
 
 
 # %%
 class LouvainAlgorithm:
     
-    def __init__(self, fitness_func=community_louvain.modularity):
-        self_fitness_func = fitness_func
+    
+    fitness_function = None
+    levels = []
+
+    def __init__(self, resolution=0.01 ,max_iter=10, fitness_function=community_louvain.modularity, verbose=False):
+        self.fitness_function = fitness_function
+        self.verbose = verbose
+        self.max_iter = max_iter
+        self.resolution = resolution
         super().__init__()
     
     def run_louvain(self, G):
         self.G = G
         A = nx.adjacency_matrix(self.G)
         initial_partition_map = dict(enumerate(self.G.nodes()))
-        result = self.run_iteration()
-        return result
+        self.levels.append(initial_partition_map)
+        result = self.run_iteration(G, initial_partition_map)
+        if self.verbose:
+            print(f"Final results are in! Algorithm found {len(np.unique(list(result.values())))} communities")
+        backtracked_partitioning = self.decode_partition_map(len(self.levels))
+        return backtracked_partitioning
 
-    def run_iteration(self, adjacency_matrix, initial_partition_map):
+    def run_iteration(self, G, initial_partition_map):
+        
         new_partition_map = self.local_movement(G, initial_partition_map)
+        if self.verbose:
+            print(f"Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
+        if new_partition_map == initial_partition_map:
+            return new_partition_map
+        self.levels.append(new_partition_map)
+        # print(new_partition_map)
+        # return new_partition_map
+        final_partition = {}
         community_map = self._extract_community_map(new_partition_map)
         num_communities = len(community_map)
-        num_nodes = len(adjacency_matrix)
-        if num_communities < num_nodes:
-            reduced_adjacency, reduced_partitions = self.reduce_network(adjacency_matrix, new_partition_map)
-            reduced_community_map = self._extract_community_map(new_partition_map)
-            final_partition = self.run_iteration(reduced_adjacency, reduced_partitions)
+        num_nodes = len(G.nodes())
+        # if num_communities < num_nodes:
+        reduced_adjacency, reduced_partitions = self.reduce_network(G, new_partition_map)
+        
+        # return new_partition_map, reduced_adjacency, reduced_partitions
+        reduced_community_map = self._extract_community_map(new_partition_map)
+        final_partition = self.run_iteration(reduced_adjacency, reduced_partitions)
+            # partition_map_old = new_partition_map
+            # for i in range(len(num_communities)):
+            #     community_map[i] = reduced_community_map[i]
+        return final_partition
 
-            partition_map_old = new_partition_map
-            for i in range(len(num_communities)):
-                community_map[i] = reduced_community_map[i]
+    def local_movement(self, G, partition_map):
+        partition_map_copy = partition_map.copy()
+        partition_map_result = None
+        initial_fitness = self.fitness_function(partition_map_copy, G)
+        fitness = -100
+        cnt = 0
+        has_improvement = True
+        # while has_improvement:
+        random_order = np.random.permutation(G.nodes())
+        has_improvement = False
+        for node in random_order:
+            has_improvement = False
+            empty_community = np.max(random_order)
+            candidates = [partition_map_copy[adjacent_node] for adjacent_node in G[node]] + [empty_community]
+            for candidate_community in candidates: 
+                curr_community = partition_map_copy[node]
+                partition_map_copy[node] = candidate_community 
+                fitness = self.fitness_function(partition_map_copy, G)
+                if fitness > initial_fitness:
+                    if self.verbose: print(f"Increase {initial_fitness:.8f} -> {fitness:.8f}")
+                    initial_fitness = fitness
+                    has_improvement = True
+                    cnt = 0
+                    continue
+                partition_map_copy[node] = curr_community   
+            
+            # print(f"New BIGLI {has_improvement} with {fitness} : {initial_fitness}")
+            cnt+=1
+            if cnt > self.max_iter:
+                break
 
-    def local_movement(self, G, communities):
-        self.fit_
-        pass
+                    # break
+            # if cnt > self.max_iter: break         
+        print(f"Local movement completed with {initial_fitness}")      
+            
 
-    def reduce_network(self, parameter_list):
-        pass
+        return partition_map_copy
+
+    def reduce_network(self, G, partition_map):
+        communities = np.unique(list(partition_map.values()))
+        # num_communities = len(communities)
+        tmp_G = nx.Graph()
+        # print(communities)
+        tmp_G.add_nodes_from(communities)
+        edge_accumulator = []
+        for node, community in partition_map.items():
+            adjacent_partitions = [partition_map[adjacent] for adjacent in G[node]] 
+            new_edges = list(itertools.product([community], adjacent_partitions))
+            edge_accumulator.extend(new_edges)
+        # for edge in edge_accumulator:
+        counter = Counter(edge_accumulator)
+        ebunch = [key+({'weight':value},) for key, value in counter.most_common()]
+        # print(ebunch)
+        # print(tmp_G.edges())
+        tmp_G.add_edges_from(ebunch)
+        # print(edge_accumulator)
+        new_partition_map = {node:idx for idx, node in enumerate(tmp_G.nodes())}
+        return tmp_G, new_partition_map
+    
+    def decode_partition_map(self, starting_level):
+        return self._decode_levels(starting_level-1, self.levels[starting_level-1])
+
+    def _decode_levels(self, level, subset):
+        partitions_from_level = self.levels[level]
+        if level == 0:
+            result = {key:partitions_from_level[key] for key in subset.keys()}
+            return  result
+        keys = np.unique(list(subset.keys()))
+        result = {}
+        for key in keys:
+            partition_subset = {node:comm for node, comm in partitions_from_level.items() if comm==key}
+            nodes = self._decode_levels(level-1, partition_subset)
+            renamed_nodes = {node:key for node in nodes}
+            result.update(renamed_nodes)
+        # print(result)
+        return result
+
 
     def _extract_partition_map(self, communities):
         # print(communities)
@@ -495,7 +593,33 @@ class LouvainAlgorithm:
         communities = list(dict(sorted(v.items())).values())
         return communities
 
-louvain_algorithm = LouvainAlgorithm()
-louvain_algorithm.run_louvain(G)
+G = nx.karate_club_graph()
+# G = nx.barbell_graph(5, 3)
+# G = nx.bull_graph()
+# G = nx.generators.erdos_renyi_graph(10, 0.5)
+# G = nx.generators.cubical_graph()
+# G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
+# G, pos = generate_benchmark_graph(250,0.1)
+print("Generated network")
+
+pos = nx.spring_layout(G)
+G, pos = generate_benchmark_graph(250,0.1)
+louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20)
+my_prt = louvain_algorithm.run_louvain(G)
+true_prt = community_louvain.best_partition(G)
+
+# %%
+fig, ax = plt.subplots(4, 1)
+fig.set_size_inches(5, 20)
+visualize_benchmark_graph(G, pos, my_prt, ax[0])
+visualize_benchmark_graph(G, pos, louvain_algorithm.levels[1], ax[1])
+visualize_benchmark_graph(G, pos, louvain_algorithm.levels[2], ax[2])
+visualize_benchmark_graph(G, pos, louvain_algorithm._decode_levels(louvain_algorithm.levels[3]), ax[3])
+visualize_benchmark_graph(G, pos, true_prt, ax[-1])
+
+# %%
+true_partition_map, communities = extract_true_communities(G)
+print(f"{normalized_mutual_information(true_partition_map, my_prt)} vs. {normalized_mutual_information(true_partition_map, true_prt)}")
+
 
 # %%
