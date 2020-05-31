@@ -23,6 +23,7 @@ import multiprocess as mp
 import matplotlib.cm as cm
 import community as community_louvain
 import scipy
+from random import random
 
 # %% [markdown]
 # # This notebook show cases some initial introductory code examples with networkx
@@ -516,10 +517,20 @@ class LouvainAlgorithm:
         # while has_improvement:
         random_order = np.random.permutation(G.nodes())
         has_improvement = False
-        for node in random_order:
+        while initial_fitness - fitness > self.resolution:
+        #     pass
+        # for node in random_order:
+            node = np.random.choice(G.nodes())
+            # print(node)
             has_improvement = False
-            empty_community = np.max(random_order)
+            current_communities = np.unique(list(partition_map_copy.values()))
+            # print(set(current_communities))
+            # print(set(range(min(current_communities), max(current_communities)+2)))
+            # print(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities))
+            empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
+            # print(empty_community)
             candidates = [partition_map_copy[adjacent_node] for adjacent_node in G[node]] + [empty_community]
+            # print(candidates)
             for candidate_community in candidates: 
                 curr_community = partition_map_copy[node]
                 partition_map_copy[node] = candidate_community 
@@ -557,7 +568,7 @@ class LouvainAlgorithm:
             edge_accumulator.extend(new_edges)
         # for edge in edge_accumulator:
         counter = Counter(edge_accumulator)
-        ebunch = [key+({'weight':value},) for key, value in counter.most_common()]
+        ebunch = [key+({'weight':value},) for key, value in counter.most_common()] # TODO
         # print(ebunch)
         # print(tmp_G.edges())
         tmp_G.add_edges_from(ebunch)
@@ -603,7 +614,7 @@ class LouvainAlgorithm:
         communities = list(dict(sorted(v.items())).values())
         return communities
 
-# G = nx.karate_club_graph()
+G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 3)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
@@ -615,12 +626,13 @@ pos = nx.spring_layout(G)
 G, pos = generate_benchmark_graph(250,0.1)
 print("Generated network")
 
-louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20)
+louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20, resolution=0.0001)
 my_prt = louvain_algorithm.run_louvain(G)
 true_prt = community_louvain.best_partition(G)
 
 # %%
 true_partition_map, communities = extract_true_communities(G)
+# true_partition_map = community_louvain.best_partition(G)
 
 num_plots = len(louvain_algorithm.levels)+1
 fig, ax = plt.subplots(num_plots, 1)
