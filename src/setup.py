@@ -281,6 +281,7 @@ def map_equation(G, partition_map):
         return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
 
     if len(G.edges()) < 0:
+        # print(f"Null result")
         return 1.0, 0, 1.0
 
     numerical_stabilizer = np.finfo(float).eps
@@ -306,11 +307,11 @@ def map_equation(G, partition_map):
     id2comm = dict(enumerate(comm2id.keys()))
     original_community_map = dict(enumerate(extract_community_map(partition_map))) # For some reason partition zero misses
     community_map = {idx:[node2id[node] for node in community] for idx, community in original_community_map.items()}
-    print("dsfösdkfs")
-    print(partition_map)
+    # print("dsfösdkfs")
+    # print(partition_map)
     partition_map = {node2id[node]:comm2id[community] for node, community in partition_map.items()}
-    print("dsfösdkfs")
-    print(partition_map)
+    # print("dsfösdkfs")
+    # print(partition_map)
     num_links = len(G.edges())
     num_nodes = len(G.nodes())
 
@@ -348,29 +349,31 @@ def map_equation(G, partition_map):
     zm2 = np.ma.masked_where(np.isnan(adjacent_partition_matrix), A)
     zm = np.ma.masked_where(np.isnan(adjacent_partition_matrix), adjacent_partition_matrix)
     apm_linkage = zm == diagonal[:, None]
-    A_in = np.ma.masked_where(apm_linkage==True, A)
-    A_ex = np.ma.masked_where(np.invert(apm_linkage)==True, A)
+    A_in = np.ma.masked_where(np.invert(apm_linkage), A)
+    A_ex = np.ma.masked_where(apm_linkage==True, A)
     unique_partitions = np.unique(list(partition_map.values()))
 
     num_partitions = len(unique_partitions)
     partition_ex_links = np.zeros(num_partitions)
     partition_in_links = np.zeros(num_partitions)
+    # partition_ex_links_ = np.zeros(num_partitions)
+    # partition_in_links_ = np.zeros(num_partitions)
 
-    if VERBOSE:
-        print("")
-        print(apm_linkage)
-        print("")
-        print(adjacent_partition_matrix)
-        print("")
-        print(zm2)
-        print("")
-        print(A_in)
-        print("")
-        print(A_ex)
+    # if VERBOSE:
+    #     print("")
+    #     print(apm_linkage)
+    #     print("")
+    #     print(adjacent_partition_matrix)
+    #     print("")
+    #     print(zm2)
+    #     print("")
+    #     print(A_in)
+    #     print("")
+    #     print(A_ex)
 
     
-    node_partition_in_links = np.sum(apm_linkage==True, axis=1)
-    node_partition_ex_links = np.sum(apm_linkage==False, axis=1)
+    # node_partition_in_links = np.sum(apm_linkage==True, axis=1)
+    # node_partition_ex_links = np.sum(apm_linkage==False, axis=1)
     
     # print("=======")
     # print(diagonal)
@@ -380,32 +383,38 @@ def map_equation(G, partition_map):
     #     print("EX",node_partition_ex_links)
     #     print("HEEERE")
 
-    print(unique_partitions)
-    print(partition_map)
-    print(comm2id)
-    print(id2comm)
+    # print(unique_partitions)
+    # print(partition_map)
+    # print(comm2id)
+    # print(id2comm)
+    # for partition in unique_partitions:
+    #     partition = int(partition)
+    #     indices_to_check = list(np.where(diagonal == partition)[0])
+    #     # print("Check", indices_to_check, "for partition", partition)
+    #     partition_in_links[partition] = sum(node_partition_in_links[indices_to_check])
+    #     partition_ex_links[partition] = sum(node_partition_ex_links[indices_to_check])
+
+    # if VERBOSE:    
+        # print(partition_in_links)
+        # print(partition_ex_links)
+        
+    node_partition_in_links = np.array(A_in.sum(axis=1)).flatten()
+    node_partition_ex_links = np.array(A_ex.sum(axis=1)).flatten()
+        
+        # print(partition_in_links)
+        # print(partition_ex_links)
     for partition in unique_partitions:
         partition = int(partition)
         indices_to_check = list(np.where(diagonal == partition)[0])
-        print("Check", indices_to_check, "for partition", partition)
+        # print("Check", indices_to_check, "for partition", partition)
         partition_in_links[partition] = sum(node_partition_in_links[indices_to_check])
         partition_ex_links[partition] = sum(node_partition_ex_links[indices_to_check])
-
-    if VERBOSE:    
-        print(partition_in_links)
-        print(partition_ex_links)
-        
-        partition_in_links = np.array(A_in.sum(axis=1)).flatten()
-        partition_ex_links = np.array(A_ex.sum(axis=1)).flatten()
-        
-        print(partition_in_links)
-        print(partition_ex_links)
     # adjacent_nodes_per_node = dict(sorted(adjacent_nodes_per_node.items()))
-    print(adjacent_partition_matrix)
-    print(node_partition_in_links)
-    print(node_partition_ex_links)
-    print(partition_in_links)
-    print(partition_ex_links)
+    # print(adjacent_partition_matrix)
+    # print(node_partition_in_links)
+    # print(node_partition_ex_links)
+    # print(partition_in_links)
+    # print(partition_ex_links)
     partition_probabilities = np.zeros(num_partitions)
     partition_links = (partition_in_links+partition_ex_links)
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
@@ -432,7 +441,9 @@ def map_equation(G, partition_map):
     module_codelength = p_circle_i.dot(H_P_i)
     L = index_codelength + module_codelength 
     L = np.asarray(L).flatten()[0]
-    
+    # print(L, index_codelength, module_codelength)
+    # if L == 0:
+    #     print("NULL")
     return L, index_codelength, module_codelength
 
 def map_equation_wrapper(partition, G):
@@ -440,30 +451,33 @@ def map_equation_wrapper(partition, G):
     return -L
 
 
-# # G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
-# VERBOSE = False
-# G = nx.karate_club_graph()
-# partition_map, fitness = louvain_algorithm.local_movement(G, dict(enumerate(G.nodes())))
-# tmp_G, new_partition_map = louvain_algorithm.reduce_network(G, new_partition)
-# new_new_partition_map, fitness = louvain_algorithm.local_movement(tmp_G, new_partition_map)
-# VERBOSE = True
-# map_equation_wrapper(new_new_partition_map, tmp_G)
+# G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
+VERBOSE = False
+G = nx.karate_club_graph()
+partition_map, fitness = louvain_algorithm.local_movement(G, dict(enumerate(G.nodes())))
+tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+VERBOSE = True
+map_equation_wrapper(partition_map, tmp_G)
 
-# # %%
-# tmp_G
-# # %%
+# %%
+map_equation_wrapper(dict(enumerate(G.nodes())), G)
+
+# %%
 VERBOSE = False
 from infomap import Infomap
 from collections import defaultdict 
 # g = convert_graph_formats(g_original, nx.Graph)
 
 # G = nx.karate_club_graph()
-G = nx.barbell_graph(5, 1)
+# G = nx.barbell_graph(5, 1)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
-# G, pos = generate_benchmark_graph(500,0.1)
+G, pos = generate_benchmark_graph(500,0.1)
 # G = tmp_G
 
 pos = nx.spring_layout(G)
@@ -602,6 +616,8 @@ class LouvainAlgorithm:
         partition_map_copy = partition_map.copy()
         partition_map_result = None
         initial_fitness = self.fitness_function(partition_map_copy, G)
+        # initial_fitness = map_equation_wrapper(partition_map_copy, G)
+
         fitness = -100
         cnt = 0
         has_improvement = True
@@ -719,14 +735,14 @@ G = nx.karate_club_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
-# G, pos = generate_benchmark_graph(250,0.1)
+G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
 
 # G, pos = generate_benchmark_graph(250,0.1)
 print("Generated network")
 
 # louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20, resolution=0.0001)
-louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=False, max_iter=20, resolution=0.05)
+louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.05)
 my_prt = louvain_algorithm.run_louvain(G)
 true_prt = community_louvain.best_partition(G)
 
