@@ -276,6 +276,7 @@ def performance_wrapper(partition, G):
 
 performance_wrapper(louvain_partition_map, G)
 # %%
+%%time
 def map_equation(G, partition_map):
     def compute_weighted_entropy(probs, normalizer):
         return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
@@ -456,11 +457,15 @@ VERBOSE = False
 G = nx.karate_club_graph()
 partition_map, fitness = louvain_algorithm.local_movement(G, dict(enumerate(G.nodes())))
 tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
-# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-# tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
-# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
 VERBOSE = True
 map_equation_wrapper(partition_map, tmp_G)
+visualize_benchmark_graph(tmp_G, pos, partition_map)
 
 # %%
 map_equation_wrapper(dict(enumerate(G.nodes())), G)
@@ -560,6 +565,7 @@ visualize_benchmark_graph(G, pos, infomap_partition)
 
 
 # %%
+# %%time
 class LouvainAlgorithm:
     
     
@@ -567,20 +573,36 @@ class LouvainAlgorithm:
     levels = []
     level_fitness = [] 
 
-    def __init__(self, resolution=0.01 ,max_iter=10, fitness_function=community_louvain.modularity, verbose=False):
+    def __init__(
+        self, 
+        resolution=0.01, 
+        max_iter=-1, 
+        fitness_function=community_louvain.modularity, 
+        verbose=False,
+        improvements=False,
+        max_local_movements=sys.maxsize
+        # stop_after
+        ):
         self.fitness_function = fitness_function
         self.verbose = verbose
         self.max_iter = max_iter
+        self.max_local_movements = max_local_movements
         self.resolution = resolution
+        self.improvements = improvements
         super().__init__()
     
+    def inititalize(self, G):
+        initial_partition_map = dict(enumerate(self.G.nodes()))
+        self.levels = []
+        self.levels.append(initial_partition_map)
+        return G, initial_partition_map
+
+
     def run_louvain(self, G):
         self.G = G
-        A = nx.adjacency_matrix(self.G)
-        initial_partition_map = dict(enumerate(self.G.nodes()))
-        self.levels.append(initial_partition_map)
+        _, initial_partition_map = self.inititalize(self.G)
         # self.level_fitness.append(-100)
-        result = self.run_iteration(G, initial_partition_map)
+        result = self.run_iteration(G, initial_partition_map, self.max_iter)
         if self.verbose:
             print(f"Final results are in! Algorithm found {len(np.unique(list(result.values())))} communities")
         backtracked_partitioning = self.decode_partition_map(len(self.levels)-1)
@@ -589,16 +611,21 @@ class LouvainAlgorithm:
     def run_iteration(self, G, initial_partition_map, stop_after=-1):
         new_partition_map, final_fitness = self.local_movement(G, initial_partition_map)
         if stop_after == 0:
+            print(F"STOP: User defined stop after {self.stop_after} iterations")
             return new_partition_map
-        if self.verbose:
-            print(f"Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
         if new_partition_map == initial_partition_map:
+            print(f"STOP: Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
             return new_partition_map
         if len(self.level_fitness) and final_fitness - self.level_fitness[-1] < self.resolution:
+            print(f"STOP: Gain of {final_fitness - self.level_fitness[-1]} fell below {self.resolution}")    
             return new_partition_map
 
+
+        if self.improvements:
+            clusters = self._extract_community_map()
         self.levels.append(new_partition_map)
         self.level_fitness.append(final_fitness)
+
         new_G, reduced_partitions = self.reduce_network(G, new_partition_map)
         
         # return new_partition_map, reduced_adjacency, reduced_partitions
@@ -627,8 +654,8 @@ class LouvainAlgorithm:
         # except Exception as identifier:
         #     pass
         # random_order = np.random.permutation(G.nodes())
-        has_improvement = False
-        while initial_fitness - fitness > self.resolution:
+        last_improvement = np.absolute(initial_fitness)
+        while True:
         #     pass
         # for node in random_order:
             node = np.random.choice(G.nodes()) if len(G.nodes()) > 1 else list(G.nodes())[0]
@@ -644,24 +671,33 @@ class LouvainAlgorithm:
             gains = [self._compute_fitness(G, partition_map_copy, initial_fitness, node, candidate_community) for candidate_community in candidates] 
             maximum_gain = max(gains, key=operator.itemgetter(1))
             if maximum_gain[1] > 0:
+                print(f"Moved node {maximum_gain[3]} to community {maximum_gain[4]}")
                 partition_map_copy = maximum_gain[0]
-                if self.verbose: print(f"Increase {initial_fitness:.8f} -> {maximum_gain[2]:.8f}")
+                last_improvement = maximum_gain[1]
                 initial_fitness = maximum_gain[2]
-                cnt = 0
+                verbose_str1 = f"Gain {maximum_gain[1]:.8f} < {self.resolution}? {last_improvement < self.resolution}"
+                verbose_str2 = f"Increase {initial_fitness:.8f} -> {maximum_gain[2]:.8f}"
+                cnt=0
+                if self.verbose: print(f"\n{verbose_str1} | {verbose_str2}")
+                if last_improvement < self.resolution:
+                    break
+            else:
+                last_improvement = 0
+                cnt+=1
 
             # partition_map_copy[node] = curr_community   
             
             # print(f"New BIGLI {has_improvement} with {fitness} : {initial_fitness}")
-            cnt+=1
-            if cnt > self.max_iter:
+            if cnt > len(G.nodes()):
+                print(f"Max iteration reached!")
                 break
-
+            
                     # break
             # if cnt > self.max_iter: break         
         print(f"Local movement completed with {initial_fitness}")      
             
 
-        return partition_map_copy, initial_fitness
+        return partition_map_copy, last_improvement
 
     def reduce_network(self, G, partition_map):
         communities = np.unique(list(partition_map.values()))
@@ -727,7 +763,7 @@ class LouvainAlgorithm:
         partition_copy[node] = community 
         fitness = self.fitness_function(partition_copy, G)
         gain = fitness - old_fitness
-        return partition_copy, gain, fitness        
+        return partition_copy, gain, fitness, node, community        
 
 G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 3)
@@ -742,7 +778,7 @@ pos = nx.spring_layout(G)
 print("Generated network")
 
 # louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20, resolution=0.0001)
-louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.05)
+louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.00000001)
 my_prt = louvain_algorithm.run_louvain(G)
 true_prt = community_louvain.best_partition(G)
 
@@ -776,7 +812,7 @@ G = nx.karate_club_graph()
 # G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
 # G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
-louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.0001)
+louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.1)
 my_prt = louvain_algorithm.run_louvain(G)
 
 # %%
