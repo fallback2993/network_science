@@ -25,8 +25,8 @@ import math
 import itertools
 from collections import OrderedDict, Counter, deque
 import pandas as pd
-import multiprocessing as mp
-# import multiprocess as mp
+# import multiprocessing as mp
+import multiprocess as mp
 import matplotlib.cm as cm
 import community as community_louvain
 import scipy

@@ -363,61 +363,61 @@ def map_equation_wrapper(partition, G):
     L, index_codelength, module_codelength = map_equation(G, partition) 
     return -L
 
-louvain_algorithm = LouvainAlgorithm(
-    fitness_function=modularity_wrapper, verbose=True, max_iter=20, resolution=0.000001)
-# tmp_G = generator.planted_partition_graph(4,20, p_in=0.9, p_out=0.1)
-# tmp_G = nx.karate_club_graph()
-tmp_G, pos = generate_benchmark_graph(250,0.1)
+# louvain_algorithm = LouvainAlgorithm(
+#     fitness_function=modularity_wrapper, verbose=True, max_iter=20, resolution=0.000001)
+# # tmp_G = generator.planted_partition_graph(4,20, p_in=0.9, p_out=0.1)
+# # tmp_G = nx.karate_club_graph()
+# tmp_G, pos = generate_benchmark_graph(250,0.1)
 
-init_G, partition_map  = louvain_algorithm.initialize(G=tmp_G)
-# partition_map = dict(enumerate(tmp_G.nodes()))
-pos = nx.spring_layout(tmp_G)
-fig, ax = plt.subplots(4, 2)
-fig.set_size_inches(10, 10)
-# VERBOSE = True
-ax[0][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
-ax[0][0].set_axis_off()
-visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][0])
+# init_G, partition_map  = louvain_algorithm.initialize(G=tmp_G)
+# # partition_map = dict(enumerate(tmp_G.nodes()))
+# pos = nx.spring_layout(tmp_G)
+# fig, ax = plt.subplots(4, 2)
+# fig.set_size_inches(10, 10)
+# # VERBOSE = True
+# ax[0][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
+# ax[0][0].set_axis_off()
+# visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][0])
 
-# ax[0][1].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
-ax[0][1].set_axis_off()
-# visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][1])
+# # ax[0][1].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
+# ax[0][1].set_axis_off()
+# # visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][1])
 
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-louvain_algorithm.levels.append(partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-ax[1][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
-ax[1][0].set_axis_off()
-visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[1][0])
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# louvain_algorithm.levels.append(partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# ax[1][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
+# ax[1][0].set_axis_off()
+# visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[1][0])
 
-backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
-ax[1][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
-ax[1][1].set_axis_off()
-visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[1][1])
+# backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
+# ax[1][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
+# ax[1][1].set_axis_off()
+# visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[1][1])
 
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-louvain_algorithm.levels.append(partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-ax[2][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
-ax[2][0].set_axis_off()
-visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[2][0])
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# louvain_algorithm.levels.append(partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# ax[2][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
+# ax[2][0].set_axis_off()
+# visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[2][0])
 
-backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
-ax[2][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
-ax[2][1].set_axis_off()
-visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[2][1])
+# backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
+# ax[2][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
+# ax[2][1].set_axis_off()
+# visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[2][1])
 
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-louvain_algorithm.levels.append(partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-ax[3][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
-ax[3][0].set_axis_off()
-visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[3][0])
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# louvain_algorithm.levels.append(partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# ax[3][0].set_title(map_equation_wrapper(partition_map, tmp_G), fontsize=10)
+# ax[3][0].set_axis_off()
+# visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[3][0])
 
-backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
-ax[3][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
-ax[3][1].set_axis_off()
-visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[3][1])
+# backtracked_map = louvain_algorithm.decode_partition_map(len(louvain_algorithm.levels)-1)
+# ax[3][1].set_title(map_equation_wrapper(backtracked_map, init_G), fontsize=10)
+# ax[3][1].set_axis_off()
+# visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[3][1])
 
 # partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
 # tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
@@ -726,7 +726,7 @@ class LouvainCoreAlgorithm:
         return partition_copy, gain, fitness, node, community        
 
 # G = nx.karate_club_graph()
-# # G = nx.barbell_graph(5, 3)
+G = nx.barbell_graph(5, 3)
 # # G = nx.bull_graph()
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
@@ -744,69 +744,69 @@ true_prt = community_louvain.best_partition(G)
 true_partition_map = community_louvain.best_partition(G)
 
 # %%
-num_plots = len(louvain_algorithm.levels)+1
-fig, ax = plt.subplots(num_plots, 2)
-fig.set_size_inches(10, 15)
+# num_plots = len(louvain_algorithm.levels)+1
+# fig, ax = plt.subplots(num_plots, 2)
+# fig.set_size_inches(10, 15)
 
-ax[0][0].set_title(f"Graph", fontsize=10)
-ax[0][0].set_axis_off()
-ax[0][1].set_title(f"True Partition -> NMI: {normalized_mutual_information(true_partition_map, true_prt)}", fontsize=10)
-ax[0][1].set_axis_off()
-visualize_benchmark_graph(G, init_pos, None, ax[0][0])
-visualize_benchmark_graph(G, init_pos, true_prt, ax[0][1])
-for cnt in range(1,num_plots-1):
-    i = cnt-1
-    tmp_G = louvain_algorithm.level_graphs[i]
-    tmp_level_prt = louvain_algorithm.levels[i+1]
-    backtracked = louvain_algorithm.decode_partition_map(i)
-    # pos = nx.spring_layout(tmp_G)
+# ax[0][0].set_title(f"Graph", fontsize=10)
+# ax[0][0].set_axis_off()
+# ax[0][1].set_title(f"True Partition -> NMI: {normalized_mutual_information(true_partition_map, true_prt)}", fontsize=10)
+# ax[0][1].set_axis_off()
+# visualize_benchmark_graph(G, init_pos, None, ax[0][0])
+# visualize_benchmark_graph(G, init_pos, true_prt, ax[0][1])
+# for cnt in range(1,num_plots-1):
+#     i = cnt-1
+#     tmp_G = louvain_algorithm.level_graphs[i]
+#     tmp_level_prt = louvain_algorithm.levels[i+1]
+#     backtracked = louvain_algorithm.decode_partition_map(i)
+#     # pos = nx.spring_layout(tmp_G)
 
-    # print(i)
-    # print(tmp_G.nodes())
-    # print(tmp_level_prt)
-    # print(backtracked)
-    # print("HEEEEEEEEEEEEEE")
-    ax[cnt][0].set_title(f"Level {i} -> NMI: {louvain_algorithm.level_fitness[i]} ", fontsize=10)
-    ax[cnt][0].set_axis_off()
-    visualize_benchmark_graph(tmp_G, pos, tmp_level_prt, ax[cnt][0])
-    # print("HAAAAAAAAAAAAAA")
-    ax[cnt][1].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, backtracked)} ", fontsize=10)
-    ax[cnt][1].set_axis_off()
-    visualize_benchmark_graph(G, pos, backtracked, ax[cnt][1])
+#     # print(i)
+#     # print(tmp_G.nodes())
+#     # print(tmp_level_prt)
+#     # print(backtracked)
+#     # print("HEEEEEEEEEEEEEE")
+#     ax[cnt][0].set_title(f"Level {i} -> NMI: {louvain_algorithm.level_fitness[i]} ", fontsize=10)
+#     ax[cnt][0].set_axis_off()
+#     visualize_benchmark_graph(tmp_G, pos, tmp_level_prt, ax[cnt][0])
+#     # print("HAAAAAAAAAAAAAA")
+#     ax[cnt][1].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, backtracked)} ", fontsize=10)
+#     ax[cnt][1].set_axis_off()
+#     visualize_benchmark_graph(G, pos, backtracked, ax[cnt][1])
 
-# tmp_G = louvain_algorithm.level_graphs[-1]
-# tmp_level_prt = louvain_algorithm.levels[i+1]
-# backtracked = louvain_algorithm.decode_partition_map(i)
+# # tmp_G = louvain_algorithm.level_graphs[-1]
+# # tmp_level_prt = louvain_algorithm.levels[i+1]
+# # backtracked = louvain_algorithm.decode_partition_map(i)
 
-# ax[-1][0].set_title(f"Level {i} -> NMI: {louvain_algorithm.level_fitness[i]} ", fontsize=10)
-# ax[-1][0].set_axis_off()
-# visualize_benchmark_graph(tmp_G, pos, tmp_level_prt, ax[-1][0])
-# # print("HAAAAAAAAAAAAAA")
-# ax[-1][1].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, backtracked)} ", fontsize=10)
-# ax[-1][1].set_axis_off()
-# visualize_benchmark_graph(G, pos, backtracked, ax[-1][1])
+# # ax[-1][0].set_title(f"Level {i} -> NMI: {louvain_algorithm.level_fitness[i]} ", fontsize=10)
+# # ax[-1][0].set_axis_off()
+# # visualize_benchmark_graph(tmp_G, pos, tmp_level_prt, ax[-1][0])
+# # # print("HAAAAAAAAAAAAAA")
+# # ax[-1][1].set_title(f"Level {i} -> NMI: {normalized_mutual_information(true_partition_map, backtracked)} ", fontsize=10)
+# # ax[-1][1].set_axis_off()
+# # visualize_benchmark_graph(G, pos, backtracked, ax[-1][1])
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 # visualize_benchmark_graph(G, pos, my_prt, ax[-1])
 
 # %%
-louvain_algorithm = LouvainCoreAlgorithm(fitness_function=modularity_wrapper, verbose=False, max_iter=20)
-infomap_algorithm = LouvainCoreAlgorithm(fitness_function=map_equation_wrapper, verbose=False, max_iter=20)
-coverage_algorithm = LouvainCoreAlgorithm(fitness_function=coverage_wrapper, verbose=False, max_iter=20)
+louvain_algorithm = LouvainCoreAlgorithm(fitness_function=modularity_wrapper, verbose=True, max_iter=20)
+infomap_algorithm = LouvainCoreAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20)
+coverage_algorithm = LouvainCoreAlgorithm(fitness_function=coverage_wrapper, verbose=True, max_iter=20)
 # lblprob_algorithm = post_transform(algorithms.asyn_lpa_communities)
 
 algorithms_for_experiment = {
-    louvain_algorithm.run: "Louvain",
     infomap_algorithm.run:"Map Equation",
+    louvain_algorithm.run: "Louvain",
     coverage_algorithm.run:"Coverage Maximization",
     # lblprob_algorithm:"Louvain Algorithm",
     }
 collected_data = []
 iterations = list(range(0, 1))
 node_sizes = [250]
-mus = np.arange(1.0, 1.1, 0.1)
+mus = np.arange(0.1, 0.6, 0.1)
 configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
 
 for configuration in configuration_set:
