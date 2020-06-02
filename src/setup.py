@@ -1,6 +1,6 @@
 #%%
 import sys
-!conda install --yes --prefix {sys.prefix} matplotlib pandas scikit-learn scipy networkx
+!conda install --yes --prefix {sys.prefix} matplotlib pandas scikit-learn scipy networkx jupyter
 # !conda install --yes --prefix {sys.prefix} -c conda-forge/label/cf202003 infomap
 !{sys.executable} -m pip install python-louvain multiprocess wurlitzer
 !{sys.executable} -m pip install -e ../vendor/py
@@ -17,7 +17,7 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics.cluster import normalized_mutual_info_score
 import math 
 import itertools
-from collections import OrderedDict, Counter
+from collections import OrderedDict, Counter, deque
 import pandas as pd
 import multiprocess as mp
 import matplotlib.cm as cm
@@ -25,6 +25,8 @@ import community as community_louvain
 import scipy
 from random import random
 import operator
+import time
+
 
 # %% [markdown]
 # # This notebook show cases some initial introductory code examples with networkx
@@ -246,7 +248,8 @@ def draw_plots(data):
         tmp.plot(ax=axes[idx])
         axes[idx].set_ylabel("Normalized Mutual Information")
 
-    fig.delaxes(*axes[num_groups:])
+    if num_groups < len(axes):
+        fig.delaxes(*axes[num_groups:])
     fig.set_tight_layout(True)
     return plt.show()
 
@@ -280,27 +283,29 @@ performance_wrapper(louvain_partition_map, G)
 def map_equation(G, partition_map):
     def compute_weighted_entropy(probs, normalizer):
         return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
-
-    if len(G.edges()) < 0:
+    # print(G.edges())
+    if len(G.nodes()) < 2:
         # print(f"Null result")
         return 1.0, 0, 1.0
 
-    numerical_stabilizer = np.finfo(float).eps
-    transition_matrix = nx.algorithms.google_matrix(G)
-    initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
-    A = transition_matrix.T  + numerical_stabilizer
-    eigen_vector = initial_starting_point
-    normalizer = 0
-    for _ in range(1000):
-        # print(_)
-        normalizer = np.linalg.norm(A * eigen_vector)
-        eigen_vector = A * eigen_vector / normalizer
-        # print(np.array(eigen_vector/sum(eigen_vector)).sum())
-        if math.isclose(normalizer, 1):
-            break
-    stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector))
-    eigen_value = normalizer  # numerical_stabilizer
+    # numerical_stabilizer = np.finfo(float).eps
+    # transition_matrix = nx.algorithms.google_matrix(G)
+    # initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
+    # A = transition_matrix.T  + numerical_stabilizer
+    # eigen_vector = initial_starting_point
+    # normalizer = 0
+    # for _ in range(1000):
+    #     # print(_)
+    #     normalizer = np.linalg.norm(A * eigen_vector)
+    #     eigen_vector = A * eigen_vector / normalizer
+    #     # print(np.array(eigen_vector/sum(eigen_vector)).sum())
+    #     if math.isclose(normalizer, 1):
+    #         break
+    # stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector))
+    # eigen_value = normalizer  # numerical_stabilizer
     
+    A = nx.adjacency_matrix(G).todense()
+
     
     node2id = dict({node: idx for idx, node in enumerate(G.nodes())})
     id2node = dict(enumerate(node2id.keys()))
@@ -331,7 +336,6 @@ def map_equation(G, partition_map):
     #     for name, community in community_map.items() 
     #     for node in community
     # }
-    A = nx.adjacency_matrix(G).todense()
     adjacent_partition_matrix = np.full([num_nodes, num_nodes], np.nan)
     for name, community in community_map.items(): 
         for node in community:
@@ -420,7 +424,10 @@ def map_equation(G, partition_map):
     partition_links = (partition_in_links+partition_ex_links)
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
 
-    node_relative_weight = stationary_node_distribution
+    # node_relative_weight = stationary_node_distribution
+
+    node_weights = np.array(A.sum(axis=0)).squeeze()
+    node_relative_weight = node_weights / node_weights.sum()
 
     for name, community in community_map.items():
         # print(community)
@@ -452,26 +459,30 @@ def map_equation_wrapper(partition, G):
     return -L
 
 
-# G = generator.planted_partition_graph(5,50, p_in=0.3, p_out=0.01)
-VERBOSE = False
-G = nx.karate_club_graph()
+tmp_G = generator.planted_partition_graph(4,20, p_in=0.9, p_out=0.1)
+partition_map = community_louvain.best_partition(tmp_G)
+pos = nx.spring_layout(tmp_G)
+# VERBOSE = True
+# tmp_G = nx.karate_club_graph()
 partition_map, fitness = louvain_algorithm.local_movement(G, dict(enumerate(G.nodes())))
-tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
-tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
-VERBOSE = True
-map_equation_wrapper(partition_map, tmp_G)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(G, partition_map)
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# partition_map, fitness = louvain_algorithm.local_movement(tmp_G, partition_map)
+# tmp_G, partition_map = louvain_algorithm.reduce_network(tmp_G, partition_map)
+# VERBOSE = True
+fig, ax = plt.subplots(2, 2)
+fig.set_size_inches(10, 10)
+ax[0][0].set_title(f"Initial Graph", fontsize=10)
+ax[0][0].set_axis_off()
+ax[0][1].set_title(f"Ground-Truth", fontsize=10)
+ax[0][1].set_axis_off()
 visualize_benchmark_graph(tmp_G, pos, partition_map)
+print(map_equation_wrapper(partition_map, tmp_G))
 
 # %%
-map_equation_wrapper(dict(enumerate(G.nodes())), G)
-
-# %%
-VERBOSE = False
 from infomap import Infomap
 from collections import defaultdict 
 # g = convert_graph_formats(g_original, nx.Graph)
@@ -565,13 +576,14 @@ visualize_benchmark_graph(G, pos, infomap_partition)
 
 
 # %%
-# %%time
+%%time
 class LouvainAlgorithm:
     
     
     fitness_function = None
     levels = []
     level_fitness = [] 
+    null_fitness = []
 
     def __init__(
         self, 
@@ -594,7 +606,15 @@ class LouvainAlgorithm:
     def inititalize(self, G):
         initial_partition_map = dict(enumerate(self.G.nodes()))
         self.levels = []
+        self.stats = {
+            "local_moving":[]
+        }
         self.levels.append(initial_partition_map)
+        initial_fitness = self.fitness_function(initial_partition_map, G)
+        self.null_fitness.append(initial_fitness)
+        self.level_fitness.append(initial_fitness)
+        self.gain_stats = []
+        self.level_graphs = []
         return G, initial_partition_map
 
 
@@ -609,6 +629,7 @@ class LouvainAlgorithm:
         return backtracked_partitioning
 
     def run_iteration(self, G, initial_partition_map, stop_after=-1):
+        # print("Initiating iteration")
         new_partition_map, final_fitness = self.local_movement(G, initial_partition_map)
         if stop_after == 0:
             print(F"STOP: User defined stop after {self.stop_after} iterations")
@@ -616,20 +637,30 @@ class LouvainAlgorithm:
         if new_partition_map == initial_partition_map:
             print(f"STOP: Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
             return new_partition_map
-        if len(self.level_fitness) and final_fitness - self.level_fitness[-1] < self.resolution:
-            print(f"STOP: Gain of {final_fitness - self.level_fitness[-1]} fell below {self.resolution}")    
-            return new_partition_map
+        # print("FGDFG")
+        # print(self.level_fitness[-1], self.null_fitness[-1])
+        # print(self.level_fitness[-1]/self.null_fitness[-1])
+        # print("FGDFG\n")
+        # gain_ratio = self.level_fitness[-1]/self.null_fitness[-1]
+        # self.gain_stats.append(gain_ratio)
+        # if gain_ratio < self.resolution:
+        #     print(f"STOP: Gain of {final_fitness - self.level_fitness[-1]} fell below {self.resolution}")    
+        #     return new_partition_map
 
-
-        if self.improvements:
-            clusters = self._extract_community_map()
+        print(f"Achieved improvement of {final_fitness - self.level_fitness[-1]} - Starting Next round!")
+        # if self.improvements:
+        #     clusters = self._extract_community_map()
         self.levels.append(new_partition_map)
         self.level_fitness.append(final_fitness)
-
         new_G, reduced_partitions = self.reduce_network(G, new_partition_map)
+        self.level_graphs.append(new_G)
+        # print({node:idx for idx, node in enumerate(new_G.nodes())})
+        # new_null_model = {node:idx for idx, node in enumerate(new_G.nodes())}
+        # new_null_fitness = self.fitness_function(new_null_model, new_G)
+        # self.null_fitness.append(new_null_fitness)
         
         # return new_partition_map, reduced_adjacency, reduced_partitions
-        reduced_community_map = self._extract_community_map(new_partition_map)
+        # reduced_community_map = self._extract_community_map(new_partition_map)
         
         # print("GESFSDFDAS", new_G.nodes())
         # print("GESFSDFDAS", reduced_partitions)
@@ -644,8 +675,9 @@ class LouvainAlgorithm:
         partition_map_result = None
         initial_fitness = self.fitness_function(partition_map_copy, G)
         # initial_fitness = map_equation_wrapper(partition_map_copy, G)
-
-        fitness = -100
+        container_of_n_last_gains = deque(maxlen=10)
+        container_of_n_last_gains.append(np.absolute(initial_fitness))
+        # fitness = -100
         cnt = 0
         has_improvement = True
         # while has_improvement:
@@ -653,53 +685,85 @@ class LouvainAlgorithm:
         #     np.random.permutation(G.nodes())
         # except Exception as identifier:
         #     pass
-        # random_order = np.random.permutation(G.nodes())
         last_improvement = np.absolute(initial_fitness)
-        while True:
+        while True and len(G.nodes()) > 1:
         #     pass
-        # for node in random_order:
-            node = np.random.choice(G.nodes()) if len(G.nodes()) > 1 else list(G.nodes())[0]
-            # print(node)
-            current_communities = np.unique(list(partition_map_copy.values()))
-            # print(set(current_communities))
-            # print(set(range(min(current_communities), max(current_communities)+2)))
-            # print(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities))
-            empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
-            # print(empty_community)
-            candidates = [partition_map_copy[adjacent_node] for adjacent_node in G[node]] + [empty_community]
-            # print(candidates)
-            gains = [self._compute_fitness(G, partition_map_copy, initial_fitness, node, candidate_community) for candidate_community in candidates] 
-            maximum_gain = max(gains, key=operator.itemgetter(1))
-            if maximum_gain[1] > 0:
-                print(f"Moved node {maximum_gain[3]} to community {maximum_gain[4]}")
-                partition_map_copy = maximum_gain[0]
-                last_improvement = maximum_gain[1]
-                initial_fitness = maximum_gain[2]
-                verbose_str1 = f"Gain {maximum_gain[1]:.8f} < {self.resolution}? {last_improvement < self.resolution}"
-                verbose_str2 = f"Increase {initial_fitness:.8f} -> {maximum_gain[2]:.8f}"
-                cnt=0
-                if self.verbose: print(f"\n{verbose_str1} | {verbose_str2}")
-                if last_improvement < self.resolution:
-                    break
-            else:
-                last_improvement = 0
-                cnt+=1
+            random_order = np.random.permutation(G.nodes()) 
+            had_improvement = False
+            for node in random_order:
+                start = time.time()
+                # node = np.random.choice(G.nodes()) if len(G.nodes()) > 1 else list(G.nodes())[0]
+                # print(node)
+                current_communities = np.unique(list(partition_map_copy.values()))
+                empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
+                # print(empty_community)
+                candidates = [partition_map_copy[adjacent_node] for adjacent_node in G[node]] + [empty_community]
+                # print(candidates)
+                gains = [
+                    self._compute_fitness(G, partition_map_copy, initial_fitness, node, candidate_community) 
+                    for candidate_community 
+                    in candidates
+                    if partition_map_copy[node] is not candidate_community
+                    ] 
+                maximum_gain = max(gains, key=operator.itemgetter(1))
+                
+                end = time.time()
+                time_in_sec = end - start
+                self.stats["local_moving"].append({"Gain":maximum_gain[1], "Fitness":maximum_gain[2], "ProcessTimeSec": time_in_sec, "Rolling_Avg": None})
+                
+                
+                if maximum_gain[1] > 0:
+
+                    rolling_average = np.mean(container_of_n_last_gains)
+                    self.stats["local_moving"][-1]["Rolling_Avg"] = rolling_average
+                    # rolling_average = np.mean(container_of_n_last_gains)
+
+                    # if rolling_average < self.resolution:
+                    #     print(f"Rolling average of {rolling_average:.8f} is below {self.resolution}") 
+                    #     break   
+                    had_improvement = True
+                    verbose_str2 = f"Increase {initial_fitness:.8f} -> {maximum_gain[2]:.8f} - {time_in_sec:.2f} sec"
+                    verbose_str3 = f"Moved node {maximum_gain[3]} to community {maximum_gain[4]}"
+                    print(maximum_gain[1])
+                    print(rolling_average)
+                    partition_map_copy = maximum_gain[0]
+                    last_improvement = maximum_gain[1]
+                    # verbose_str1 = f"Gain {maximum_gain[1]:.8f} < {self.resolution}? {last_improvement < self.resolution}"
+                    initial_fitness = maximum_gain[2]
+                    container_of_n_last_gains.append(maximum_gain[1])
+                    cnt=0
+                    if self.verbose: print(f"{verbose_str2} | {verbose_str3}\n")
+                cnt += 1
+            if had_improvement == False:
+                print("No further improvement!")
+                break
+
+            if (cnt % 10) == 0:
+                print(f"{cnt} node checks without improvement") 
+                # if last_improvement < self.resolution:
+                #     break
+            # else:
+            #     last_improvement = 0
+            #     cnt+=1
 
             # partition_map_copy[node] = curr_community   
             
             # print(f"New BIGLI {has_improvement} with {fitness} : {initial_fitness}")
-            if cnt > len(G.nodes()):
+            if cnt > self.max_local_movements:
                 print(f"Max iteration reached!")
                 break
             
                     # break
             # if cnt > self.max_iter: break         
-        print(f"Local movement completed with {initial_fitness}")      
+        print(f"--- Local movement completed with {initial_fitness} ---\n")      
             
 
         return partition_map_copy, last_improvement
 
     def reduce_network(self, G, partition_map):
+        print("Start reduction")
+        start = time.time()
+
         communities = np.unique(list(partition_map.values()))
         # num_communities = len(communities)
         tmp_G = nx.Graph()
@@ -718,11 +782,15 @@ class LouvainAlgorithm:
         tmp_G.add_edges_from(ebunch)
         # print(edge_accumulator)
         new_partition_map = {node:idx for idx, node in enumerate(tmp_G.nodes())}
+        end = time.time()
+        print(f"Took {start:.2f} seconds to generate the reduced graph")
         return tmp_G, new_partition_map
     
     def decode_partition_map(self, starting_level):
-        if starting_level <= 1:
+        if starting_level == 0:
             return self._sort_partition_map(self.levels[0])
+        if starting_level == 1:
+            return self._sort_partition_map(self.levels[1])
         result = self._decode_levels(starting_level-1, self.levels[starting_level])
 
         return self._sort_partition_map(result)
@@ -765,20 +833,21 @@ class LouvainAlgorithm:
         gain = fitness - old_fitness
         return partition_copy, gain, fitness, node, community        
 
-G = nx.karate_club_graph()
+# G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 3)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
-# G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
-G, pos = generate_benchmark_graph(250,0.1)
+G = generator.planted_partition_graph(4,20, p_in=0.9, p_out=0.1)
+# G, pos = generate_benchmark_graph(250,0.3)
 pos = nx.spring_layout(G)
 
 # G, pos = generate_benchmark_graph(250,0.1)
 print("Generated network")
 
 # louvain_algorithm = LouvainAlgorithm(verbose=True, max_iter=20, resolution=0.0001)
-louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.00000001)
+louvain_algorithm = LouvainAlgorithm(
+    fitness_function=modularity_wrapper, verbose=True, max_iter=20, resolution=0.000001)
 my_prt = louvain_algorithm.run_louvain(G)
 true_prt = community_louvain.best_partition(G)
 
@@ -804,15 +873,20 @@ visualize_benchmark_graph(G, pos, true_prt, ax[-1])
 
 
 # %%
-G = nx.karate_club_graph()
+# G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 3)
 # G = nx.bull_graph()
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(4,10, p_in=0.9, p_out=0.1)
-# G, pos = generate_benchmark_graph(250,0.1)
+G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
-louvain_algorithm = LouvainAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20, resolution=0.1)
+louvain_algorithm = LouvainAlgorithm(fitness_function=coverage_wrapper, verbose=True, max_iter=20, resolution=0.000001)
 my_prt = louvain_algorithm.run_louvain(G)
+visualize_benchmark_graph(G, pos, my_prt)
+
+# %%
+
+x = pd.DataFrame.from_records([elem.values() for elem in louvain_algorithm.stats])
 
 # %%

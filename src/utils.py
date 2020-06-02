@@ -23,8 +23,16 @@ def extract_true_communities(G):
     return partition, communities
 
 def extract_partition_map(communities):
+    # print(communities)
     node_community_participation = {node:idx for idx, community in enumerate(communities) for node in community}
     return OrderedDict(sorted(node_community_participation.items()))
+
+def extract_community_map(partition):
+    v = {}
+    for key, value in partition.items():
+        v.setdefault(value, []).append(key)
+    communities = list(dict(sorted(v.items())).values())
+    return communities
 
 def generate_benchmark_graph(n, mu=0.1):
     tau1 = 2 # Degree distribution power-law exponent
@@ -33,15 +41,19 @@ def generate_benchmark_graph(n, mu=0.1):
     pos = nx.spring_layout(G, k=.3)
     return G, pos
 
-def visualize_benchmark_graph(G, pos, partition, ax=None):
-    return nx.draw_networkx(G, 
-    pos, 
-    edge_color="black", 
-    with_labels=False, 
-    node_size=50, 
-    cmap=plt.cm.viridis, 
-    node_color=list(partition.values()), 
-    ax=ax)
+def visualize_benchmark_graph(G, pos, partition = None, ax=None):
+    if partition:
+        cmap = cm.get_cmap('viridis', max(partition.values()) + 1)
+        nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
+                            cmap=cmap, node_color=list(partition.values()), ax=ax)
+        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
+    else:
+        nx.draw_networkx_nodes(G, pos, node_size=40, ax=ax)
+        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
+    return None
+
+def sort_partition_map(partition_map):
+    return dict(sorted(partition_map.items())) 
 
 def compute_experiment(configuration):
     iteration, predictor, node_size, mu = configuration
