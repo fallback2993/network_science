@@ -10,7 +10,6 @@ import numpy as np
 import math 
 import itertools
 from collections import OrderedDict, Counter, deque
-from utils import extract_community_map
 # import pandas as pd
 # import multiprocess as mp
 # import matplotlib.cm as cm
@@ -111,3 +110,10 @@ def map_equation(G, partition_map):
     L = np.asarray(L).flatten()[0]
 
     return L, index_codelength, module_codelength
+
+def extract_community_map(partition):
+    v = {}
+    for key, value in partition.items():
+        v.setdefault(value, []).append(key)
+    communities = list(dict(sorted(v.items())).values())
+    return communities

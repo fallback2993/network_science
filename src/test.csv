@@ -1,0 +1,5 @@
+method,N,µ,NMI
+Louvain,250,0.1,1.0
+Map Equation,250,0.1,0.5302389916644372
+Coverage Maximization,250,0.1,0.8304394982333289
+Louvain Algorithm,250,0.1,0.9037273271600033

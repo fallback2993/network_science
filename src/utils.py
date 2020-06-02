@@ -11,6 +11,9 @@ import math
 import itertools
 from collections import OrderedDict, Counter
 import pandas as pd
+from algorithms.map_equation import map_equation
+import community as community_louvain
+
 
 
 def extract_true_communities(G):
@@ -57,13 +60,28 @@ def sort_partition_map(partition_map):
 
 def compute_experiment(configuration):
     iteration, predictor, node_size, mu = configuration
-    print(f"Running {iteration} iteration of configuration {(node_size, mu)} for predictor {predictor.__name__}")
+    print(f"{iteration}. iteration for config {(node_size, mu)} with algorithm {predictor[1]}")
     G, pos = generate_benchmark_graph(node_size,mu)
     true_partition_map, communities = extract_true_communities(G)
-    communities = algorithms.asyn_lpa_communities(G)
-    pred_partition_map = extract_partition_map(communities)
+    pred_partition_map = predictor[0](G)
+    # pred_partition_map = extract_partition_map(communities)
     nmi = normalized_mutual_information(true_partition_map, pred_partition_map)
-    return {"method":predictor.__name__, "N":node_size, "µ":mu, "NMI":nmi}
+    return {"method":predictor[1], "N":node_size, "µ":mu, "NMI":nmi}
+
+def post_transform(algorithm):
+    def modified_function(G):
+        communities = algorithm(G)
+        pred_partition_map = extract_partition_map(communities)
+        return pred_partition_map
+    modified_function.__name__ = algorithm.__name__
+    return modified_function
+
+def modified_girvan_newman():
+    def modified_function(G):
+        communities = next(algorithms.girvan_newman(G))
+        pred_partition_map = extract_partition_map(communities)
+        return pred_partition_map
+    return modified_function
 
 def compute_entropy(partition_map):
     class_counts = np.array(list(Counter(partition_map.values()).values()))
@@ -91,3 +109,14 @@ def normalized_mutual_information(true_partitions, pred_partitions):
     nominator = 2 * conditional_entropy
     denominator = sum_of_independent_entropies
     return nominator/denominator
+
+def map_equation_wrapper(partition, G):
+    L, index_codelength, module_codelength = map_equation(G, partition) 
+    return -L
+
+def modularity_wrapper(partition, G):
+    return community_louvain.modularity(partition, G)
+    
+def coverage_wrapper(partition, G):
+    community_map = extract_community_map(partition)
+    return algorithms.coverage(G, community_map)
