@@ -577,47 +577,29 @@ class LouvainAlgorithm:
 
     def run_iteration(self, G, initial_partition_map, stop_after=-1):
         # print("Initiating iteration")
-        new_partition_map, final_fitness = self.local_movement(G, initial_partition_map)
-        if stop_after == 0:
-            print(F"STOP: User defined stop after {self.stop_after} iterations")
-            return new_partition_map
-        if new_partition_map == initial_partition_map:
-            print(f"STOP: Both community_maps are the same -> {new_partition_map == initial_partition_map}")    
-            return new_partition_map
-        # print("FGDFG")
-        # print(self.level_fitness[-1], self.null_fitness[-1])
-        # print(self.level_fitness[-1]/self.null_fitness[-1])
-        # print("FGDFG\n")
-        # gain_ratio = self.level_fitness[-1]/self.null_fitness[-1]
-        # self.gain_stats.append(gain_ratio)
-        # if gain_ratio < self.resolution:
-        #     print(f"STOP: Gain of {final_fitness - self.level_fitness[-1]} fell below {self.resolution}")    
-        #     return new_partition_map
+        tmp_partition_map = initial_partition_map.copy()
+        tmp_G = G
+        while True:
+            new_partition_map, final_fitness = self.local_movement(tmp_G, tmp_partition_map)
+            if stop_after == 0:
+                print(F"STOP: User defined stop after {self.stop_after} iterations")
+                break
+            if new_partition_map == tmp_partition_map:
+                print(f"STOP: Both community_maps are the same -> {new_partition_map == tmp_partition_map}")    
+                break
 
-        print(f"Achieved improvement of {final_fitness - self.level_fitness[-1]} - Starting Next round!")
-        # if self.improvements:
-        #     clusters = self._extract_community_map()
-        self.levels.append(new_partition_map)
-        self.level_fitness.append(final_fitness)
-        new_G, reduced_partitions = self.reduce_network(G, new_partition_map)
-        self.level_graphs.append(new_G)
-        # print({node:idx for idx, node in enumerate(new_G.nodes())})
-        # new_null_model = {node:idx for idx, node in enumerate(new_G.nodes())}
-        # new_null_fitness = self.fitness_function(new_null_model, new_G)
-        # self.null_fitness.append(new_null_fitness)
-        
-        # return new_partition_map, reduced_adjacency, reduced_partitions
-        # reduced_community_map = self._extract_community_map(new_partition_map)
-        
-        # print("GESFSDFDAS", new_G.nodes())
-        # print("GESFSDFDAS", reduced_partitions)
-        final_partition = self.run_iteration(new_G, reduced_partitions, stop_after-1)
-            # partition_map_old = new_partition_map
-            # for i in range(len(num_communities)):
-            #     community_map[i] = reduced_community_map[i]
-        return final_partition
+            print(f"Achieved improvement of {final_fitness - self.level_fitness[-1]} - Starting Next round!")
+            self.levels.append(new_partition_map)
+            self.level_fitness.append(final_fitness)
+            new_G, reduced_partition = self.reduce_network(tmp_G, new_partition_map)
+            self.level_graphs.append(new_G)
+            tmp_G = new_G
+            tmp_partition_map = reduced_partition
+
+        return tmp_partition_map
 
     def local_movement(self, G, partition_map):
+
         partition_map_copy = partition_map.copy()
         partition_map_result = None
         initial_fitness = self.fitness_function(partition_map_copy, G)
@@ -712,22 +694,17 @@ class LouvainAlgorithm:
         start = time.time()
 
         communities = np.unique(list(partition_map.values()))
-        # num_communities = len(communities)
         tmp_G = nx.Graph()
-        # print(communities)
         tmp_G.add_nodes_from(communities)
-        edge_accumulator = []
+        edge_accumulator = Counter()
         for node, community in partition_map.items():
             adjacent_partitions = [partition_map[adjacent] for adjacent in G[node]] 
             new_edges = list(itertools.product([community], adjacent_partitions))
-            edge_accumulator.extend(new_edges)
-        # for edge in edge_accumulator:
-        counter = Counter(edge_accumulator)
-        ebunch = [key+({'weight':value},) for key, value in counter.most_common()] # TODO
-        # print(ebunch)
-        # print(tmp_G.edges())
+            if self.verbose: print(f"Node {node}: Community {community} connectected to {len(adjacent_partitions)} oder communities")
+            edge_accumulator.update(new_edges)
+
+        ebunch = [key+({'weight':value},) for key, value in edge_accumulator.most_common()] # TODO
         tmp_G.add_edges_from(ebunch)
-        # print(edge_accumulator)
         new_partition_map = {node:idx for idx, node in enumerate(tmp_G.nodes())}
         end = time.time()
         print(f"Took {start:.2f} seconds to generate the reduced graph")
@@ -786,7 +763,7 @@ class LouvainAlgorithm:
 # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # G = nx.generators.cubical_graph()
 G = generator.planted_partition_graph(4,20, p_in=0.9, p_out=0.1)
-# G, pos = generate_benchmark_graph(250,0.3)
+# G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
 
 # G, pos = generate_benchmark_graph(250,0.1)
