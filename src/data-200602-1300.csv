@@ -1,0 +1,21 @@
+method,N,µ,NMI
+Labelpropagation Algorithm,250,0.1,0.9564852968832452
+Labelpropagation Algorithm,250,0.2,0.9078969820214157
+Labelpropagation Algorithm,250,0.30000000000000004,0.7891035098685438
+Labelpropagation Algorithm,250,0.4,0.0
+Labelpropagation Algorithm,250,0.5,0.0
+Map Equation,250,0.1,0.6112617528974237
+Map Equation,250,0.2,0.30544511288102655
+Map Equation,250,0.30000000000000004,0.1568879138229796
+Map Equation,250,0.4,0.40271525966841953
+Map Equation,250,0.5,0.21921075058590364
+Louvain Algorithm,250,0.1,1.0
+Louvain Algorithm,250,0.2,1.0
+Louvain Algorithm,250,0.30000000000000004,0.9692763981294293
+Louvain Algorithm,250,0.4,0.812365111915852
+Louvain Algorithm,250,0.5,0.3635529429425118
+Coverage Maximization,250,0.1,0.9552392553111235
+Coverage Maximization,250,0.2,0.5822950368733664
+Coverage Maximization,250,0.30000000000000004,0.4958355317031127
+Coverage Maximization,250,0.4,0.0
+Coverage Maximization,250,0.5,0.0
