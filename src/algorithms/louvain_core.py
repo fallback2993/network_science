@@ -73,6 +73,7 @@ class LouvainCoreAlgorithm:
     def run_iteration(self, G, initial_partition_map, max_iter=-1):
         tmp_partition_map = initial_partition_map.copy()
         tmp_G = G
+
         while True:
             new_partition_map, final_fitness = self.local_movement(tmp_G, tmp_partition_map)
             if max_iter == 0:
@@ -82,11 +83,11 @@ class LouvainCoreAlgorithm:
                 print(f"STOP: Both community_maps are the same -> {new_partition_map == tmp_partition_map}")    
                 break
 
-            print(f"Achieved improvement of {final_fitness - self.level_fitness[-1]} - Starting Next round!")
             self.levels.append(new_partition_map)
             self.level_fitness.append(final_fitness)
+            self.level_graphs.append(tmp_G)
+            print(f"Achieved improvement of {final_fitness - self.level_fitness[-1]} - Starting Next round!")
             new_G, reduced_partition = self.reduce_network(tmp_G, new_partition_map)
-            self.level_graphs.append(new_G)
             tmp_G = new_G
             tmp_partition_map = reduced_partition
             max_iter -= 1
@@ -140,7 +141,7 @@ class LouvainCoreAlgorithm:
                     container_of_n_last_gains.append(maximum_gain[1])
                     cnt=0
                     if self.verbose: print(f"{verbose_str2} | {verbose_str3}")
-            cnt += 1
+                cnt += 1
             if had_improvement == False:
                 print("No further improvement!")
                 break
@@ -166,7 +167,7 @@ class LouvainCoreAlgorithm:
         for node, community in partition_map.items():
             adjacent_partitions = [partition_map[adjacent] for adjacent in G[node]] 
             new_edges = itertools.product([community], adjacent_partitions)
-            if self.verbose: print(f"Node {node}: Community {community} connectected to {len(adjacent_partitions)} oder communities")
+            if self.verbose: print(f"Node {node}: Community {community} connectected to {len(adjacent_partitions)} other communities")
             edge_accumulator.update(new_edges)
 
         ebunch = [key+({'weight':value},) for key, value in edge_accumulator.most_common()] # TODO
@@ -220,4 +221,4 @@ class LouvainCoreAlgorithm:
         partition_copy[node] = community 
         fitness = self.fitness_function(partition_copy, G)
         gain = fitness - old_fitness
-        return partition_copy, gain, fitness, node, community 
+        return partition_copy, gain, fitness, node, community   

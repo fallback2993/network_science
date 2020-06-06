@@ -21,24 +21,10 @@ from collections import OrderedDict, Counter, deque
 def map_equation(G, partition_map):
     def compute_weighted_entropy(probs, normalizer):
         return np.nansum((probs/normalizer) * np.log2(probs/normalizer))
-
-    if len(G.edges()) < 0:
+    if len(G.nodes()) < 2:
         return 1.0, 0, 1.0
-
-    numerical_stabilizer = np.finfo(float).eps
-    transition_matrix = nx.algorithms.google_matrix(G)
-    initial_starting_point = np.ones((transition_matrix.shape[0],1))/transition_matrix.shape[0]
-    A = transition_matrix.T  + numerical_stabilizer
-    eigen_vector = initial_starting_point
-    normalizer = 0
-    for _ in range(1000):
-        normalizer = np.linalg.norm(A * eigen_vector)
-        eigen_vector = A * eigen_vector / normalizer
-        if math.isclose(normalizer, 1):
-            break
-    stationary_node_distribution = np.array(eigen_vector/sum(eigen_vector))
-    eigen_value = normalizer  # numerical_stabilizer
     
+    A = nx.adjacency_matrix(G).todense()
     
     node2id = dict({node: idx for idx, node in enumerate(G.nodes())})
     id2node = dict(enumerate(node2id.keys()))
@@ -51,7 +37,6 @@ def map_equation(G, partition_map):
     num_links = len(G.edges())
     num_nodes = len(G.nodes())
 
-    A = nx.adjacency_matrix(G).todense()
     adjacent_partition_matrix = np.full([num_nodes, num_nodes], np.nan)
     for name, community in community_map.items(): 
         for node in community:
@@ -77,7 +62,7 @@ def map_equation(G, partition_map):
         
     node_partition_in_links = np.array(A_in.sum(axis=1)).flatten()
     node_partition_ex_links = np.array(A_ex.sum(axis=1)).flatten()
-
+        
     for partition in unique_partitions:
         partition = int(partition)
         indices_to_check = list(np.where(diagonal == partition)[0])
@@ -88,7 +73,8 @@ def map_equation(G, partition_map):
     partition_links = (partition_in_links+partition_ex_links)
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
 
-    node_relative_weight = stationary_node_distribution
+    node_weights = np.array(A.sum(axis=0)).squeeze()
+    node_relative_weight = node_weights / node_weights.sum()
 
     for name, community in community_map.items():
         partition_probabilities[name] = sum(node_relative_weight[community])
