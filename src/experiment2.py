@@ -1,15 +1,11 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %%
-from IPython import get_ipython
 
 # %%
-get_ipython().system('conda install --yes --prefix {sys.prefix} matplotlib pandas scikit-learn scipy networkx jupyter')
+import sys
+!conda install --yes --prefix {sys.prefix} matplotlib pandas scikit-learn scipy networkx jupyter
 # !conda install --yes --prefix {sys.prefix} -c conda-forge/label/cf202003 infomap
-get_ipython().system('{sys.executable} -m pip install python-louvain multiprocess wurlitzer')
-get_ipython().system('{sys.executable} -m pip install -e ../vendor/py')
-get_ipython().run_line_magic('matplotlib', 'inline')
-
+!{sys.executable} -m pip install python-louvain multiprocess 
+!{sys.executable} -m pip install -e ../vendor/py
+%matplotlib inline
 
 # %%
 import networkx as nx
@@ -23,7 +19,7 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics.cluster import normalized_mutual_info_score
 import math 
 import itertools
-from collections import OrderedDict, Counter, deque
+from collections import OrderedDict, Counter, deque, defaultdict
 import pandas as pd
 import multiprocess as mp
 import matplotlib.cm as cm
@@ -31,217 +27,363 @@ import community as community_louvain
 import scipy
 from random import random
 import operator
+from utils import extract_partition_map, extract_community_map, visualize_benchmark_graph
+
+import pickle
+import torch
+from torch import FloatTensor, LongTensor
+from typing import Dict, Callable, List
+import numpy as np
+import matplotlib.pyplot as plt
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+# https://medium.com/@sddkal/random-walks-on-adjacency-matrices-a127446a6777#:~:text=A%20random%20walk%20is%20a,can%20perform%20a%20random%20walk.
+# %%
+G = nx.karate_club_graph()
+# G = nx.barbell_graph(5, 2)
+# # G = nx.bull_graph()
+# # G = nx.generators.erdos_renyi_graph(10, 0.5)
+# # G = nx.generators.cubical_graph()
+# G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.3)
+# G, pos = generate_benchmark_graph(250,0.3)
+pos = nx.spring_layout(G)
+true_partition_map = community_louvain.best_partition(G)
+lpa_prt = extract_partition_map(algorithms.asyn_lpa_communities(G))
+communities = extract_community_map(true_partition_map)
+
+nx.draw_networkx(G, pos, edgecolors="black", node_size=600, cmap=plt.cm.RdYlBu, node_color=list(true_partition_map.values()))
+
+# %%
+def random_walk(a, i, iters):
+    # a -> adj
+    # i -> starting row
+    walk = np.zeros(iters+1) # holds transitions
+    walk[0] = i
+    elements = np.arange(a.shape[0]) # for our graph [0,1,2,3]
+    c_index = i # current index for this iteration
+    for k in range(iters):
+        count = 0 # count of transitions
+        probs = a[c_index].reshape((-1,))  # probability of transitions
+        # sample from probs
+        sample = np.random.choice(elements,p=probs) # sample a target using probs
+        index = sample # go to target
+        walk[k+1] = index
+        c_index = index
+    return walk
+
+# print(pd.DataFrame(nx.adj_matrix(G).todense()))
+walk_length = 100000
+markov_matrix = np.array(nx.google_matrix(G, alpha=1))
+nodes = G.nodes()
+vocab = {f"node_{node}":node for node in nodes}
+n2voc = {node:name for name, node in vocab.items()}
+starting_point = np.random.choice(nodes)
+walk = random_walk(markov_matrix, starting_point, walk_length)
+walk
 
 
 # %%
-def extract_true_communities(G):
-    communities = []
-    for v in G:
-        curr_community = G.nodes[v]['community']
-        if not any([v in community for community in communities]):
-            communities.append(frozenset(curr_community))
-    partition = extract_partition_map(communities)
-    return partition, communities
+sliding_windows = np.vstack((walk,np.roll(walk, -1), np.roll(walk, -2), np.roll(walk, -3), np.roll(walk, -4))).astype(np.int)
+sliding_windows
+# %%
+cooccurence_matrix = np.zeros_like(markov_matrix)
+center_node_pos = int(sliding_windows.shape[0]/2)
+for pos in range(walk_length):
+    left_left_word = sliding_windows[0, pos]
+    left_word = sliding_windows[1, pos]
+    center_word = sliding_windows[2, pos]
+    right_word = sliding_windows[3, pos]
+    right_right_word = sliding_windows[4, pos]
+    # print(center_word)
+    # print(left_word)
+    # print(right_word)
+    cooccurence_matrix[center_word,left_word] += 1
+    cooccurence_matrix[center_word,right_word] += 1
+    cooccurence_matrix[center_word,left_left_word] += 1
+    cooccurence_matrix[center_word,right_right_word] += 1
 
-def extract_partition_map(communities):
-    # print(communities)
-    node_community_participation = {node:idx for idx, community in enumerate(communities) for node in community}
-    return OrderedDict(sorted(node_community_participation.items()))
-
-def extract_community_map(partition):
-    v = {}
-    for key, value in partition.items():
-        v.setdefault(value, []).append(key)
-    communities = list(dict(sorted(v.items())).values())
-    return communities
-
-def generate_benchmark_graph(n, mu=0.1):
-    tau1 = 2 # Degree distribution power-law exponent
-    tau2 = 1.1 # Community size distribtution power-law exponent
-    G = generator.LFR_benchmark_graph(n, tau1, tau2, mu, min_degree=20, max_degree=50, max_iters=1000, seed=10)
-    pos = nx.spring_layout(G, k=.3)
-    return G, pos
-
-def visualize_benchmark_graph(G, pos, partition = None, ax=None):
-    if partition:
-        cmap = cm.get_cmap('viridis', max(partition.values()) + 1)
-        nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
-                            cmap=cmap, node_color=list(partition.values()), ax=ax)
-        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
-    else:
-        nx.draw_networkx_nodes(G, pos, node_size=40, ax=ax)
-        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
-    return None
-
-def sort_partition_map(partition_map):
-    return dict(sorted(partition_map.items()))    
-
-def post_transform(algorithm):
-    def modified_function(G):
-        communities = algorithm(G)
-        pred_partition_map = extract_partition_map(communities)
-        return pred_partition_map
-    modified_function.__name__ = algorithm.__name__
-    return modified_function
-
+pd.DataFrame(cooccurence_matrix)
 
 # %%
-# %%
-print(f"Drawing some community network graphs and predictions")
-G, pos = generate_benchmark_graph(250,0.3)
-true_partition_map, communities = extract_true_communities(G)
-communities = algorithms.greedy_modularity_communities(G)
-cnm_partition_map = extract_partition_map(communities)
-communities = algorithms.asyn_lpa_communities(G)
-lpa_partition_map = extract_partition_map(communities)
+X = torch.tensor(cooccurence_matrix)
+X = X.to(device) # If GPU enabled
+X = X.to(torch.float64) + 0.1
 
-# fig = plt.figure(figsize=(10, 10), dpi= 80); #plt.clf()
-fig, ax = plt.subplots(1, 3)
-ax[0].set_title(f"Ground-Truth", fontsize=10)
-ax[0].set_axis_off()
-ax[1].set_title(f"Greedy Max Modularity ", fontsize=10)
-ax[1].set_axis_off()
-ax[2].set_title(f"Label-Propagation", fontsize=10)
-ax[2].set_axis_off()
-visualize_benchmark_graph(G, pos, true_partition_map, ax[0])
-visualize_benchmark_graph(G, pos, cnm_partition_map, ax[1])
-visualize_benchmark_graph(G, pos, lpa_partition_map, ax[2])
-plt.tight_layout()
-plt.show()
+def to_probabilities(count_matrix: FloatTensor) -> FloatTensor:
+    return count_matrix / torch.sum(count_matrix, dim=1)
 
+P = to_probabilities(X)
+P
+ # %%
+def weight_fn(X: FloatTensor, x_max: int, a: float) -> FloatTensor:
+    all_ones = torch.ones_like(X, requires_grad = False)
+    temp = torch.pow(X/x_max, 0.75)
+    result = torch.where(X<x_max, torch.pow(X/x_max, 0.75), torch.ones_like(X))
+    return result
+
+X_weighted = weight_fn(X, 100, 0.75)
+X_weighted = X_weighted.to(device)
+X_weighted
 
 # %%
-def compute_entropy(partition_map):
-    class_counts = np.array(list(Counter(partition_map.values()).values()))
-    class_probabilities = class_counts/sum(class_counts) 
-    partial_entropies = - class_probabilities * np.log2(class_probabilities)
-    entropy = partial_entropies.sum() 
-    return entropy
+def loss_fn(X_weighted: FloatTensor, W: FloatTensor, W_context: FloatTensor, 
+            B: FloatTensor, B_context: FloatTensor, 
+            X: FloatTensor, device:str = "cpu") -> FloatTensor:
+    hypothesis = (torch.mm(W, W_context.transpose(0,1))  + B + B_context).type(torch.DoubleTensor).to(device)
+    target = torch.log(X)
+    squared_loss = ((hypothesis - target)**2)
+    temp = torch.mul(X_weighted, squared_loss)
+    result = torch.sum(temp)
+    return result
 
-def compute_conditional_entropy(hx, hy, hxy):
-    return hx + hy - hxy
+class GloVe(torch.nn.Module):
+    def __init__(self, vocab: Dict[str, int], vector_dimensionality: int=30, device: str='cpu') -> None:
+        super(GloVe, self).__init__()
+        self.device = device
+        self.vocab_len = len(vocab)
+        self.w = torch.nn.Embedding(num_embeddings = self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
+        self.wc = torch.nn.Embedding(num_embeddings = self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
+        self.b = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=1).to(self.device)
+        self.bc = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=1).to(self.device)
+        
+    def forward(self, X_weighted: FloatTensor, X: FloatTensor) -> FloatTensor:
+        embedding_input = torch.arange(self.vocab_len).to(self.device)
+        W = self.w(embedding_input)
+        W_context = self.wc(embedding_input)
+        B = self.b(embedding_input)
+        B_context = self.bc(embedding_input)
+        return loss_fn(X_weighted, W, W_context,B, B_context, X, self.device)
+    
+    def get_vectors(self) -> FloatTensor:
+        embedding_input = torch.arange(self.vocab_len).to(self.device)
+        return self.w(embedding_input) + self.wc(embedding_input)
 
-def compute_joint_entropy(true_partitions, pred_partitions):
-    cnt_matrix = contingency_matrix(list(true_partitions.values()), list(pred_partitions.values())).T
-    matrix_sum = cnt_matrix.sum()
-    prob_matrix = cnt_matrix / matrix_sum
-    joint_entorpy = -np.nansum(prob_matrix*np.log2(prob_matrix))
-    return joint_entorpy
+num_epochs = 300
+all_losses = []
+network = GloVe(vocab=vocab,vector_dimensionality=30, device=device)
+opt = torch.optim.Adam(network.parameters(), lr=0.05) 
 
-def normalized_mutual_information(true_partitions, pred_partitions):
-    H_X = compute_entropy(true_partitions)
-    H_Y = compute_entropy(pred_partitions)
-    H_XY = compute_joint_entropy(true_partitions, pred_partitions)
-    conditional_entropy =  compute_conditional_entropy(H_X, H_Y, H_XY)
-    sum_of_independent_entropies = H_X + H_Y
-    nominator = 2 * conditional_entropy
-    denominator = sum_of_independent_entropies
-    return nominator/denominator
+for i in range(num_epochs):
+    loss = network.forward(X_weighted, X) # backward
+    value = loss.data.cpu().numpy()
+    if i % 20 == 0:
+        print(f"Epoch: {i} - Loss is currently at: {loss}")
+    all_losses.append(value)
+    loss.backward()
+    opt.step()
+    opt.zero_grad()   
 
-true_nmi = normalized_mutual_information(true_partition_map, true_partition_map)
-cnm_nmi = normalized_mutual_information(true_partition_map, cnm_partition_map)
-cnm_nmi_reversed = normalized_mutual_information(cnm_partition_map, true_partition_map)
-lpa_nmi = normalized_mutual_information(true_partition_map, lpa_partition_map)
-
-assert math.isclose(true_nmi, 1), f"True nmi does not equal one with the score of {true_nmi}"
-print(f"NMI of true prediction with true prediction amounts to {true_nmi} == 1.0.")
-
-assert cnm_nmi < 1, f"Clauset-Moore-Newman not below 1 with {cnm_nmi}"
-print(f"NMI of ground truth with cnm prediction amounts to {cnm_nmi} < 1")
-
-assert cnm_nmi == cnm_nmi_reversed, f"NMI score for NMI(X,Y) is not the same as NMI(Y,X)"
-print(f"Reversed NMI score is {cnm_nmi_reversed}")
-
-assert cnm_nmi < 1, f"Label propagation is not below 1 with {lpa_nmi}"
-print(f"NMI of ground truth with lpa prediction amounts to {lpa_nmi} < 1")
-
-
-# %%
-import utils
-algorithms_for_experiment = {
-    # modified_girvan_newman(): "Girvan-Newman",
-    utils.post_transform(algorithms.greedy_modularity_communities):"Greedy Modularity Maximization",
-    utils.post_transform(algorithms.asyn_lpa_communities):"Label Propagation",
-    community_louvain.best_partition:"Louvain Algorithm"
-    }
-collected_data = []
-iterations = list(range(0,1))
-node_sizes = [250]
-mus = np.arange(0.1, 1.1-0.9, 0.1)
-configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
-
-for configuration in configuration_set:
-    collected_data.append(utils.compute_experiment(configuration))
-
-data = pd.DataFrame(collected_data)
-data.head()
-
+plt.plot(np.array(all_losses))
 
 # %%
-def draw_plots(data):
-    aggregated_over_trials = data.groupby(['method', 'N', 'µ']).mean()
-    grouped_by_algorithm = aggregated_over_trials.groupby(['method'])
-    num_groups = len(grouped_by_algorithm)
-    num_rows = int(math.ceil(num_groups/2))
-    tmp = None
-    fig, axes = plt.subplots(num_rows, 2, sharex=True, sharey=True) 
-    fig.set_size_inches(10, 5*num_rows)
-    axes = axes.flatten()
-    for idx, (algorithm_name, algorithm_data) in enumerate(grouped_by_algorithm):
-        axes[idx].set_title(algorithm_name)
-        tmp = algorithm_data.reset_index().pivot(index='µ', columns='N', values='NMI')
-        tmp.plot(ax=axes[idx])
-        axes[idx].set_ylabel("Normalized Mutual Information")
-
-    if num_groups < len(axes):
-        fig.delaxes(*axes[num_groups:])
-    fig.set_tight_layout(True)
-    return plt.show()
-
-draw_plots(data)
+def similarity(word_i: str, word_j: str, vocab: Dict[str, int], vectors: FloatTensor) -> float:
+    i = vocab[word_i]
+    j = vocab[word_j] 
+    v_i = vectors[i] / torch.norm(vectors[i], p=2)  # a/|a|
+    v_j = vectors[j] / torch.norm(vectors[j], p=2)  # b/|b|
+    sim = torch.mm(v_i.view(1, -1), v_j.view(-1, 1)).item()
+    return sim
 
 
-# %%
-import utils
-from algorithms.louvain_core import LouvainCoreAlgorithm
+def similarities(word_i: str, vocab: Dict[str, int], vectors: FloatTensor) -> FloatTensor:
+    i = vocab[word_i]
+    comparison_vector = vectors[i]
+    inner_products = torch.mm(comparison_vector.view(1,-1), vectors.transpose(0,1))
+    matrix_norms = torch.norm(vectors, p=2, dim=1)
+    comparison_norm = torch.norm(comparison_vector, p=2)
+    return inner_products/(comparison_norm*matrix_norms)
 
+def most_similar(word_i: str, vocab: Dict[str, int], vectors: FloatTensor, k: int) -> List[str]:
+    sims = similarities(word_i, vocab, vectors)
+    _, topi = sims.topk(dim=-1, k=k)
+    topi = topi.view(-1).cpu().numpy().tolist()
+    inv = {v: i for i, v in vocab.items()}
+    return [inv[i] for i in topi if inv[i] != word_i]
 
-louvain_algorithm = LouvainCoreAlgorithm(fitness_function=utils.modularity_wrapper, verbose=False, max_iter=20)
-infomap_algorithm = LouvainCoreAlgorithm(fitness_function=utils.map_equation_wrapper, verbose=False, max_iter=20)
-coverage_algorithm = LouvainCoreAlgorithm(fitness_function=utils.coverage_wrapper, verbose=False, max_iter=20)
-lblprob_algorithm = utils.post_transform(algorithms.asyn_lpa_communities)
+word_vectors = network.get_vectors().detach()
+for word in ['node_0', 'node_6' ,'node_9', 'node_7']:
+    print('Most similar words to {}: {}'.format(word, most_similar(word, vocab, word_vectors, 6)))
 
-
-
-algorithms_for_experiment = {
-    lblprob_algorithm:"Labelpropagation Algorithm",
-    infomap_algorithm.run:"Map Equation",
-    louvain_algorithm.run: "Louvain Algorithm",
-    coverage_algorithm.run:"Coverage Maximization",
-    }
-
-collected_data = []
-iterations = list(range(0, 1))
-node_sizes = [250]
-mus = np.arange(0.1, 0.8, 0.1)
-configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
-
-
-for configuration in configuration_set:
-    collected_data.append(utils.compute_experiment(configuration))
-
-data = pd.DataFrame(collected_data)
-data.head()
-
+# nx.draw_networkx(G, pos, edgecolors="black", node_size=600, cmap=plt.cm.RdYlBu, node_color=list(true_partition_map.values()))
 
 # %%
-draw_plots(data)
-
+# for prt in np.unique(list(true_partition_map.values())):
+all_pairs = list(itertools.permutations(vocab.keys(),2))
+all_pair_scores = list(zip(all_pairs, (similarity(n1, n2, vocab, word_vectors) for n1, n2 in all_pairs)))
+all_pair_scores
 
 # %%
-data.to_csv('data-200602-1300.csv', index=False)
+edge_proximities = {}
+for n1, n2 in G.edges():
+    # print(n1, n2)
+    prt = "_".join(set((str(true_partition_map[n1]), str(true_partition_map[n2]))))
+    edge = (n1, n2)
+    edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
+
+edge_proximities
+# %%
+partition_aggregation = defaultdict(float)
+partition_counts = defaultdict(float)
+for (n1, n2, prt), sim in edge_proximities.items():
+    partition_aggregation[prt] += sim
+    partition_counts[prt] += 1
+
+a_partition_aggregation = np.array(list(partition_aggregation.values()))
+a_partition_counts = np.array(list(partition_counts.values()))
+print(partition_aggregation.keys())
+print(a_partition_aggregation)
+print(a_partition_counts)
+print(a_partition_aggregation/a_partition_counts)
+print(sum(a_partition_aggregation/a_partition_counts))
+print(a_partition_aggregation.sum())
+print(a_partition_aggregation.sum()/len(G.nodes()))
+
+# %%
+random_prt = dict(enumerate(G.nodes()))
+edge_proximities = {}
+for n1, n2 in G.edges():
+    # print(n1, n2)
+    prt = "_".join(set((str(random_prt[n1]), str(random_prt[n2]))))
+    edge = (n1, n2)
+    edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
+
+partition_aggregation = defaultdict(float)
+partition_counts = defaultdict(float)
+for (n1, n2, prt), sim in edge_proximities.items():
+    partition_aggregation[prt] += sim
+    partition_counts[prt] += 1
+
+a_partition_aggregation = np.array(list(partition_aggregation.values()))
+a_partition_counts = np.array(list(partition_counts.values()))
+print(partition_aggregation.keys())
+print(a_partition_aggregation)
+print(a_partition_counts)
+print(a_partition_aggregation/a_partition_counts)
+print(sum(a_partition_aggregation/a_partition_counts))
+print(a_partition_aggregation.sum())
+print(a_partition_aggregation.sum()/len(G.nodes()))
+
+# %%
+random_prt = dict(itertools.product(G.nodes(), [0]))
+edge_proximities = {}
+for n1, n2 in G.edges():
+    # print(n1, n2)
+    prt = "_".join(set((str(random_prt[n1]), str(random_prt[n2]))))
+    edge = (n1, n2)
+    edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
+
+partition_aggregation = defaultdict(float)
+partition_counts = defaultdict(float)
+for (n1, n2, prt), sim in edge_proximities.items():
+    partition_aggregation[prt] += sim
+    partition_counts[prt] += 1
+
+a_partition_aggregation = np.array(list(partition_aggregation.values()))
+a_partition_counts = np.array(list(partition_counts.values()))
+print(partition_aggregation.keys())
+print(a_partition_aggregation)
+print(a_partition_counts)
+print(a_partition_aggregation/a_partition_counts)
+print(sum(a_partition_aggregation/a_partition_counts))
+print(a_partition_aggregation.sum())
+print(a_partition_aggregation.sum()/len(G.nodes()))
+
+# %%
+
+def similarities_to_others(c_vec:FloatTensor, vocab: Dict[str, int], vectors: FloatTensor) -> FloatTensor:
+    comparison_vector = c_vec
+    inner_products = torch.mm(comparison_vector.view(1,-1), vectors.transpose(0,1))
+    matrix_norms = torch.norm(vectors, p=2, dim=1)
+    comparison_norm = torch.norm(comparison_vector, p=2)
+    return inner_products/(comparison_norm*matrix_norms)
+
+def most_similar_vector(c_vec:FloatTensor, vocab: Dict[str, int], vectors: FloatTensor, skip:List[int]) -> List[str]:
+    sims = similarities_to_others(c_vec, vocab, vectors)
+    values, indices = sims.sort(descending=True)
+    topi = indices.view(-1).cpu().numpy().tolist()
+    topv = values.view(-1).cpu().numpy().tolist()
+    sorted_mapping = [(val, idx) for val, idx in zip(topv, topi) if idx not in skip]
+    inv = {v: i for i, v in vocab.items()}
+    most_similar = sorted_mapping[0]
+    return inv[most_similar[1]], most_similar[0], most_similar[1]
+
+def update_centroid(centroid, centroid_cnt, added_vector):
+    retrun ((centroid * centroid_cnt) + added_vector)/(centroid_cnt + 1)
+
+random_prt = dict(enumerate(G.nodes()))
+unique_partitions = np.unique(list(random_prt.values()))
+num_partitions = len(unique_partitions)
+edge_proximities = {}
+partition_sums = torch.zeros(num_partitions, word_vectors.shape[1])
+partition_counts = torch.zeros(num_partitions)
 
 
+other_copy = random_prt.copy()
+for n1 in G.nodes():
+    n2 =  (n2voc[n1], vocab, word_vectors, 2)[0]
+    other_copy[n1]=random_prt[vocab[n2]]
+
+for node, prt in random_prt.items():
+    partition_sums[prt] += word_vectors[node]
+    partition_counts[prt] += 1
+# partition_centroids = partition_sums/partition_counts[prt]
+
+before_change = random_prt.copy()
+for prt_idx, (prt_sum, prt_count) in enumerate(zip(partition_sums, partition_counts)):
+    if prt_count==0:
+        continue
+    prt_centroid = prt_sum/prt_count
+    prt_nodes = [node for node, community in random_prt.items() if community == prt_idx]
+    node, diff_to_centroid, node_idx = most_similar_vector(prt_centroid, vocab, word_vectors, prt_nodes)
+    node_idx = vocab[node]
+    prev_prt = random_prt[node_idx]
+    node_vector = word_vectors[node_idx]
+    random_prt[node_idx] = prt_idx
+    partition_sums[prt_idx] += node_vector
+    partition_counts[prt_idx] += 1
+    partition_sums[prev_prt] -= node_vector
+    partition_counts[prev_prt] -= 1
+
+print(before_change)
+print("")
+print(other_copy)
+print("")
+print(random_prt)
+
+visualize_benchmark_graph(G, nx.spring_layout(G), random_prt)
+
+# def most_similar(word_i: str, vocab: Dict[str, int], vectors: FloatTensor, k: int) -> List[str]:
+#     sims = similarities(word_i, vocab, vectors)
+#     _, topi = sims.topk(dim=-1, k=k)
+#     topi = topi.view(-1).cpu().numpy().tolist()
+#     inv = {v: i for i, v in vocab.items()}
+#     return [inv[i] for i in topi if inv[i] != word_i]
+
+
+# for n1, n2 in G.edges():
+#     # print(n1, n2)
+#     prt = "_".join(set((str(random_prt[n1]), str(random_prt[n2]))))
+#     edge = (n1, n2)
+#     edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
+    # most_sim = most_similar(n2voc[n1], vocab, word_vectors, 1)
+    
+
+# tmp_G = nx.Graph()
+# for n1 in G.nodes():
+#     n2 = most_similar(n2voc[n1], vocab, word_vectors, 2)[0]
+#     random_prt[n1]=random_prt[n2]
+    # tmp_G.add_edge(n1, vocab[n2])
+
+# tmp_pos = nx.spring_layout(tmp_G)
+# nx.draw_networkx(tmp_G, tmp_pos, edgecolors="black", node_size=600, cmap=plt.cm.RdYlBu, node_color=list(true_partition_map.values()))
+
+# partition_aggregation = defaultdict(float)
+# for (n1, n2, prt), sim in edge_proximities.items():
+#     partition_aggregation[prt] += sim
+#     partition_counts[prt] += 1
+
+# %%
 
 
 # %%
