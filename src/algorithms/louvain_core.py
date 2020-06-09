@@ -35,7 +35,7 @@ class LouvainCoreAlgorithm:
         max_iter=-1, 
         fitness_function=community_louvain.modularity, 
         verbose=False,
-        max_local_movements=sys.maxsize,
+        max_local_movements=100,
         stop_after=-1
         ):
         super().__init__()

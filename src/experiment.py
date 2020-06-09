@@ -114,8 +114,8 @@ def normalized_mutual_information(true_partitions, pred_partitions):
 def run_experiment(algorithms_for_experiment, backup):
 
     collected_data = []
-    iterations = list(range(0, 10))
-    node_sizes = [250, 500]
+    iterations = list(range(0, 3))
+    node_sizes = [250]
     mus = np.arange(0.1, 0.8, 0.1)
     configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
 
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     algorithms_for_experiment = {
         infomap_algorithm.run:"Map Equation",
-        coverage_algorithm.run:"Coverage Maximization",
+        # coverage_algorithm.run:"Coverage Maximization",
         # lblprob_algorithm:"Labelpropagation Algorithm",
         # louvain_algorithm.run: "Louvain Algorithm",
     }

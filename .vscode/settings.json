@@ -13,5 +13,5 @@
         "**/*.code-search": true
     },
     // "python.auto"
-    "python.pythonPath": "C:\\Users\\ohund\\Anaconda3\\envs\\mkl\\python.exe"
+    "python.pythonPath": "C:\\Users\\ohund\\Anaconda3\\envs\\ptgpu\\python.exe"
 }

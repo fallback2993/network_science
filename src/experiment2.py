@@ -40,12 +40,12 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 # https://medium.com/@sddkal/random-walks-on-adjacency-matrices-a127446a6777#:~:text=A%20random%20walk%20is%20a,can%20perform%20a%20random%20walk.
 # %%
-G = nx.karate_club_graph()
+# G = nx.karate_club_graph()
 # G = nx.barbell_graph(5, 2)
 # # G = nx.bull_graph()
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
-# G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.3)
+G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
 # G, pos = generate_benchmark_graph(250,0.3)
 pos = nx.spring_layout(G)
 true_partition_map = community_louvain.best_partition(G)
@@ -291,15 +291,18 @@ print(a_partition_aggregation.sum()/len(G.nodes()))
 
 # %%
 
-def similarities_to_others(c_vec:FloatTensor, vocab: Dict[str, int], vectors: FloatTensor) -> FloatTensor:
-    comparison_vector = c_vec
-    inner_products = torch.mm(comparison_vector.view(1,-1), vectors.transpose(0,1))
-    matrix_norms = torch.norm(vectors, p=2, dim=1)
-    comparison_norm = torch.norm(comparison_vector, p=2)
-    return inner_products/(comparison_norm*matrix_norms)
+def similarities_to_others(c_vec:FloatTensor, vectors: FloatTensor) -> FloatTensor:
+    try:
+        comparison_vector = c_vec
+        inner_products = torch.mm(comparison_vector.view(1,-1), vectors.transpose(0,1))
+        matrix_norms = torch.norm(vectors, p=2, dim=1)
+        comparison_norm = torch.norm(comparison_vector, p=2)
+        return inner_products/(comparison_norm*matrix_norms)
+    except RuntimeError as identifier:
+        pass
 
 def most_similar_vector(c_vec:FloatTensor, vocab: Dict[str, int], vectors: FloatTensor, skip:List[int]) -> List[str]:
-    sims = similarities_to_others(c_vec, vocab, vectors)
+    sims = similarities_to_others(c_vec, vectors)
     values, indices = sims.sort(descending=True)
     topi = indices.view(-1).cpu().numpy().tolist()
     topv = values.view(-1).cpu().numpy().tolist()
@@ -309,11 +312,21 @@ def most_similar_vector(c_vec:FloatTensor, vocab: Dict[str, int], vectors: Float
     return inv[most_similar[1]], most_similar[0], most_similar[1]
 
 def update_centroid(centroid, centroid_cnt, added_vector):
-    retrun ((centroid * centroid_cnt) + added_vector)/(centroid_cnt + 1)
+    return ((centroid * centroid_cnt) + added_vector)/(centroid_cnt + 1)
+
+def compute_avg_diff_to_centroid(nodes, word_vectors):
+    if len(nodes) == 0:
+        return torch.zeros_like(word_vectors[[0]]).sum()
+    prt_candidate_vectors = word_vectors[nodes]
+    prt_candidate_centroid = prt_candidate_vectors.sum(axis=0)/prt_candidate_vectors.shape[0]
+    candidate_sum_of_centroid_diff = similarities_to_others(prt_candidate_centroid, prt_candidate_vectors)
+    candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum()/candidate_sum_of_centroid_diff.shape[1]
+    return candidate_avg_centroid_differences
 
 random_prt = dict(enumerate(G.nodes()))
 unique_partitions = np.unique(list(random_prt.values()))
 num_partitions = len(unique_partitions)
+# random_prt = {node: prt for node, prt in zip(G.nodes(), np.random.randint(0,high=max(unique_partitions),size=num_partitions))}
 edge_proximities = {}
 partition_sums = torch.zeros(num_partitions, word_vectors.shape[1])
 partition_counts = torch.zeros(num_partitions)
@@ -327,32 +340,123 @@ for n1 in G.nodes():
 for node, prt in random_prt.items():
     partition_sums[prt] += word_vectors[node]
     partition_counts[prt] += 1
-# partition_centroids = partition_sums/partition_counts[prt]
 
-before_change = random_prt.copy()
-for prt_idx, (prt_sum, prt_count) in enumerate(zip(partition_sums, partition_counts)):
-    if prt_count==0:
-        continue
-    prt_centroid = prt_sum/prt_count
-    prt_nodes = [node for node, community in random_prt.items() if community == prt_idx]
-    node, diff_to_centroid, node_idx = most_similar_vector(prt_centroid, vocab, word_vectors, prt_nodes)
-    node_idx = vocab[node]
-    prev_prt = random_prt[node_idx]
-    node_vector = word_vectors[node_idx]
-    random_prt[node_idx] = prt_idx
-    partition_sums[prt_idx] += node_vector
-    partition_counts[prt_idx] += 1
-    partition_sums[prev_prt] -= node_vector
-    partition_counts[prev_prt] -= 1
+# for n1 in G.nodes():
+#     n2 = most_similar(n2voc[n1], vocab, word_vectors, 2)[0]
+#     print("")
+#     print(n1)
+#     print(vocab[n2])
+#     random_prt[n1]=random_prt[vocab[n2]]
+    # tmp_G.add_edge(n1, vocab[n2])
 
-print(before_change)
-print("")
-print(other_copy)
-print("")
-print(random_prt)
+statistics = []
+for i in range(2):
+    rollier = deque(maxlen=10)
+    # rollier.append(1)
+    rolling_movements = []
+    candidates = []
+    absolute_movements = []
+    random_node_order = np.random.permutation(list(random_prt.items()))
+    for node_idx, curr_prt in random_node_order:
+        # print("")
+        # print(f"----{node_idx}----")
+        store = None
+        prt_candidates = set(
+            random_prt[adj_node] 
+            for adj_node 
+            in list(G[node_idx]) 
+            if random_prt[adj_node] is not curr_prt)
+        if len(prt_candidates) == 0:
+            print(f"No candidates")
+            continue
+        # print(f"{len(prt_candidates)} candidates")
+        prt_nodes = [node for node, community in random_prt.items() if community == curr_prt and node != node_idx]
+        curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors)
+        curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors)
+        # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
+        giver_gain = (curr_avg_diff - curr_avg_diff_with_change).cpu().numpy().flatten()
+        # if giver_gain < 0:
+        #     # print(f"Giver gain is negative")
+        #     continue
+        change_candidates = []
+        for idx, prt_candidate in enumerate(prt_candidates):
+            prt_candidate_nodes = [node for node, community in random_prt.items() if community == prt_candidate]
+            candidate_avg_diff = compute_avg_diff_to_centroid(prt_candidate_nodes, word_vectors)
+            candidate_avg_diff_with_change = compute_avg_diff_to_centroid(prt_candidate_nodes + [node_idx], word_vectors)
+            receiver_gain = candidate_avg_diff_with_change - candidate_avg_diff
+            # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
+            change_candidates.append((prt_candidate, (receiver_gain + giver_gain)/len(prt_candidate_nodes)))
+            # break
+                
+        maximum_gain = max(change_candidates, key=operator.itemgetter(1))
+        abs_gain = maximum_gain[1].cpu().numpy()
+        # print(change_candidates)
+        # print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} => {maximum_gain[1]}")
+        
+        # if receiver_gain + giver_gain > 0:
+        random_prt[node_idx] = maximum_gain[0]
+        # print(f"Partition {random_prt[node_idx]} chosen. Prev. Partition: {curr_prt}")
+        receiver_gain = abs_gain - giver_gain
+        rollier.append(abs_gain)
+        
+        rolling_mean = np.mean(rollier)
 
-visualize_benchmark_graph(G, nx.spring_layout(G), random_prt)
+        # rolling_movements.append(rolling_mean)
+        # candidates.append(len(prt_candidates))
+        # absolute_movements.append(maximum_gain[1].cpu().numpy())
+        # print(f"Absolute gain: {abs_gain[0]:.8f} = {receiver_gain[0]:.8f} + {giver_gain[0]:.8f}")
+        data_point = {
+            "rol":rolling_mean, 
+            "receiver_gain":receiver_gain[0], 
+            "giver_gain":giver_gain[0], 
+            "abs": abs_gain[0], 
+            "candidates":len(prt_candidates),
+            "partitions":len(set(random_prt.values()))
+        }
+        statistics.append(data_point)
+    # if rolling_mean < 0.04:
+    #     break
 
+data = pd.DataFrame(statistics)
+# # partition_centroids = partition_sums/partition_counts[prt]
+
+# before_change = random_prt.copy()
+# for prt_idx, (prt_sum, prt_count) in enumerate(zip(partition_sums, partition_counts)):
+#     if prt_count==0:
+#         continue
+#     prt_centroid = prt_sum/prt_count
+#     prt_nodes = [node for node, community in random_prt.items() if community == prt_idx]
+#     node, diff_to_centroid, node_idx = most_similar_vector(prt_centroid, vocab, word_vectors, prt_nodes)
+#     node_idx = vocab[node]
+#     prev_prt = random_prt[node_idx]
+#     node_vector = word_vectors[node_idx]
+#     random_prt[node_idx] = prt_idx
+#     partition_sums[prt_idx] += node_vector
+#     partition_counts[prt_idx] += 1
+#     partition_sums[prev_prt] -= node_vector
+#     partition_counts[prev_prt] -= 1
+
+# print(before_change)
+# print("")
+# print(other_copy)
+# print("")
+# print(random_prt)
+fig, ax = plt.subplots(7,1)
+fig.set_size_inches(5, 15)
+visualize_benchmark_graph(G, nx.spring_layout(G), random_prt, ax=ax[0])
+ax[1].plot(data["giver_gain"])
+ax[2].plot(data["receiver_gain"])
+ax[3].plot(data["abs"])
+ax[4].plot(data["rol"])
+ax[5].plot(data["candidates"])
+ax[6].plot(data["partitions"])
+ax[1].set_title("giver_gain")
+ax[2].set_title("receiver_gain")
+ax[3].set_title("abs")
+ax[4].set_title("rol")
+ax[5].set_title("candidates")
+ax[6].set_title("partitions")
+plt.tight_layout()
 # def most_similar(word_i: str, vocab: Dict[str, int], vectors: FloatTensor, k: int) -> List[str]:
 #     sims = similarities(word_i, vocab, vectors)
 #     _, topi = sims.topk(dim=-1, k=k)
@@ -370,10 +474,7 @@ visualize_benchmark_graph(G, nx.spring_layout(G), random_prt)
     
 
 # tmp_G = nx.Graph()
-# for n1 in G.nodes():
-#     n2 = most_similar(n2voc[n1], vocab, word_vectors, 2)[0]
-#     random_prt[n1]=random_prt[n2]
-    # tmp_G.add_edge(n1, vocab[n2])
+
 
 # tmp_pos = nx.spring_layout(tmp_G)
 # nx.draw_networkx(tmp_G, tmp_pos, edgecolors="black", node_size=600, cmap=plt.cm.RdYlBu, node_color=list(true_partition_map.values()))

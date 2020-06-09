@@ -24,6 +24,34 @@ def map_equation(G, partition_map):
     if len(G.nodes()) < 2:
         return 1.0, 0, 1.0
     
+    num_links = len(G.edges())
+    num_nodes = len(G.nodes())
+    unique_partitions = np.unique(list(partition_map.values()))
+    num_partitions = len(unique_partitions)
+
+    p_a_i, q_out_i, q_out, p_circle_i,p_u, partition_map, community_map = map_equation_essentials(G, partition_map)
+    H_Q = - sum(np.nan_to_num((q_out_i/q_out) * np.log2(q_out_i/q_out)))
+    term1 = -np.nan_to_num((q_out_i/p_circle_i)*np.log2((q_out_i/p_circle_i)))
+    term2 = np.zeros(num_partitions)
+    for name, community in community_map.items():
+        term2[name] = -compute_weighted_entropy(p_u[community], p_circle_i[name])
+    
+    H_P_i = term1 + term2
+    index_codelength = q_out * H_Q 
+    module_codelength = p_circle_i.dot(H_P_i)
+    L = index_codelength + module_codelength 
+    L = np.asarray(L).flatten()[0]
+
+    return L, index_codelength, module_codelength
+
+def extract_community_map(partition):
+    v = {}
+    for key, value in partition.items():
+        v.setdefault(value, []).append(key)
+    communities = list(dict(sorted(v.items())).values())
+    return communities
+
+def map_equation_essentials(G, partition_map):
     A = nx.adjacency_matrix(G).todense()
     
     node2id = dict({node: idx for idx, node in enumerate(G.nodes())})
@@ -74,32 +102,14 @@ def map_equation(G, partition_map):
     partition_exit_prob = np.nan_to_num(partition_ex_links/partition_links)/num_partitions
 
     node_weights = np.array(A.sum(axis=0)).squeeze()
-    node_relative_weight = node_weights / node_weights.sum()
+    p_u = node_weights / node_weights.sum()
 
     for name, community in community_map.items():
-        partition_probabilities[name] = sum(node_relative_weight[community])
-        
+        partition_probabilities[name] = sum(p_u[community])
+
     p_a_i = partition_probabilities
     q_out_i = partition_exit_prob
     q_out = q_out_i.sum()
-    H_Q = - sum(np.nan_to_num((q_out_i/q_out) * np.log2(q_out_i/q_out)))
     p_circle_i = p_a_i + q_out_i
-    term1 = -np.nan_to_num((q_out_i/p_circle_i)*np.log2((q_out_i/p_circle_i)))
-    term2 = np.zeros(num_partitions)
-    for name, community in community_map.items():
-        term2[name] = -compute_weighted_entropy(node_relative_weight[community], p_circle_i[name])
-    
-    H_P_i = term1 + term2
-    index_codelength = q_out * H_Q 
-    module_codelength = p_circle_i.dot(H_P_i)
-    L = index_codelength + module_codelength 
-    L = np.asarray(L).flatten()[0]
 
-    return L, index_codelength, module_codelength
-
-def extract_community_map(partition):
-    v = {}
-    for key, value in partition.items():
-        v.setdefault(value, []).append(key)
-    communities = list(dict(sorted(v.items())).values())
-    return communities
+    return p_a_i, q_out_i, q_out, p_circle_i, p_u, partition_map, community_map

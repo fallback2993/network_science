@@ -14,6 +14,7 @@ import pandas as pd
 from algorithms.map_equation import map_equation
 import community as community_louvain
 import io
+import matplotlib.cm as cm
 
 
 
