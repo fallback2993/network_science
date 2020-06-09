@@ -350,7 +350,7 @@ for node, prt in random_prt.items():
     # tmp_G.add_edge(n1, vocab[n2])
 
 statistics = []
-for i in range(2):
+for i in range(1):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
@@ -365,12 +365,19 @@ for i in range(2):
             random_prt[adj_node] 
             for adj_node 
             in list(G[node_idx]) 
-            if random_prt[adj_node] is not curr_prt)
+            # if random_prt[adj_node] != curr_prt
+            )
         if len(prt_candidates) == 0:
             print(f"No candidates")
             continue
         # print(f"{len(prt_candidates)} candidates")
-        prt_nodes = [node for node, community in random_prt.items() if community == curr_prt and node != node_idx]
+        prt_nodes = [
+            node 
+            for node, community 
+            in random_prt.items() 
+            if community == curr_prt 
+            and node != node_idx
+        ]
         curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors)
         curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors)
         # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
