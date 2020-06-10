@@ -370,10 +370,6 @@ for i in range(1):
     random_node_order = np.random.permutation(list(random_prt.keys()))
     for node_idx in random_node_order:
         # print("")
-        try:
-            random_prt[node_idx]
-        except expression as identifier:
-            pass
         curr_prt = random_prt[node_idx]
         # print("")
         # print(f"----{node_idx}----")
@@ -382,7 +378,7 @@ for i in range(1):
             random_prt[adj_node] 
             for adj_node 
             in list(G[node_idx]) 
-            # if random_prt[adj_node] != curr_prt
+            if random_prt[adj_node] != curr_prt
             )
         empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
         prt_candidates.add(empty_community)
@@ -416,7 +412,7 @@ for i in range(1):
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             normalizer = len(prt_candidate_nodes)
             # normalizer = 1
-            change_candidates.append((prt_candidate, (receiver_gain + giver_gain)/normalizer, receiver_gain, giver_gain, normalizer))
+            change_candidates.append((prt_candidate, (receiver_gain/normalizer + giver_gain), receiver_gain, giver_gain, normalizer))
             # break
                 
         choose = 1
@@ -428,10 +424,10 @@ for i in range(1):
         giver_gain = maximum_gain[3]
         normalizer = maximum_gain[4]
         # print(change_candidates)
-        print("")
-        print(f"{node_idx} - {len(change_candidates)} candidates")
-        print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
-        print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
+        # print("")
+        # print(f"{node_idx} - {len(change_candidates)} candidates")
+        # print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
+        # print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
         # if maximum_gain[choose] < 0:
         #     continue
         
@@ -482,7 +478,7 @@ data = pd.DataFrame(statistics)
 # print("")
 # print(random_prt)
 fig, ax = plt.subplots(7,1)
-fig.set_size_inches(10, 20)
+fig.set_size_inches(10, 50)
 visualize_benchmark_graph(G, nx.spring_layout(G), random_prt, ax=ax[0])
 ax[1].plot(data["giver_gain"])
 ax[2].plot(data["receiver_gain"])
@@ -525,16 +521,24 @@ plt.tight_layout()
 #     partition_counts[prt] += 1
 
 # %%
+
 def show_subset(prt_id, partition, G, pos, ax=None):
     subset = {node: prt if prt == prt_id else -1 for node, prt in random_prt.items()}
     # print(G.nodes())
-    return visualize_benchmark_graph(G, pos, partition=subset)
+    return visualize_benchmark_graph(G, pos, partition=subset, ax=ax)
 
-final_unique_partitions = set(random_prt.values())
-final_num = len(final_unique_partitions)
-fig, ax  = plt.subplots(final_num, 1)
-fig.set_size_inches(10, 5 * final_num)
-for prt_id, ax in zip(final_unique_partitions, ax):
-    show_subset(prt_id, random_prt, G, pos, ax)
-plt.tight_layout()
+def show_all_identified_partitions(random_prt, G, pos):
+    final_unique_partitions = set(random_prt.values())
+    final_num = len(final_unique_partitions)
+    fig, ax  = plt.subplots(final_num, 1)
+    fig.set_size_inches(10, 5 * final_num)
+    for prt_id, ax in zip(final_unique_partitions, ax):
+        ax.set_title(f"Partition {prt_id}")
+        show_subset(prt_id, random_prt, G, pos, ax)
+    return plt.tight_layout()
+
+show_all_identified_partitions(random_prt, G, pos)
+# %%
+
+
 # %%
