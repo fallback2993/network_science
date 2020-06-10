@@ -114,16 +114,16 @@ def normalized_mutual_information(true_partitions, pred_partitions):
 def run_experiment(algorithms_for_experiment, backup):
 
     collected_data = []
-    iterations = list(range(0, 3))
-    node_sizes = [250]
+    iterations = list(range(0, 7))
+    node_sizes = [250, 500]
     mus = np.arange(0.1, 0.8, 0.1)
     configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
 
 
-    cpu_cnt = 10
+    cpu_cnt = 9
     print(cpu_cnt)
     # with mp.Pool(cpu_cnt) as pool:
-    pool = mp.Pool(processes=2)
+    pool = mp.Pool(processes=cpu_cnt)
     print(f"Running experiments in parallel with {cpu_cnt} cpus")
     parallel_execution_data = pool.imap_unordered(compute_experiment, configuration_set)
     
@@ -166,8 +166,8 @@ if __name__ == "__main__":
     lblprob_algorithm = post_transform(algorithms.asyn_lpa_communities)
 
     algorithms_for_experiment = {
-        infomap_algorithm.run:"Map Equation",
-        # coverage_algorithm.run:"Coverage Maximization",
+        # infomap_algorithm.run:"Map Equation",
+        coverage_algorithm.run:"Coverage Maximization",
         # lblprob_algorithm:"Labelpropagation Algorithm",
         # louvain_algorithm.run: "Louvain Algorithm",
     }
