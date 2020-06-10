@@ -45,8 +45,8 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 # # G = nx.bull_graph()
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
-# G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
-G, pos = generate_benchmark_graph(250,0.1)
+G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
+# G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
 true_partition_map = community_louvain.best_partition(G)
 lpa_prt = extract_partition_map(algorithms.asyn_lpa_communities(G))
@@ -89,12 +89,12 @@ sliding_windows
 # %%
 cooccurence_matrix = np.zeros_like(markov_matrix)
 center_node_pos = int(sliding_windows.shape[0]/2)
-for pos in range(walk_length):
-    left_left_word = sliding_windows[0, pos]
-    left_word = sliding_windows[1, pos]
-    center_word = sliding_windows[2, pos]
-    right_word = sliding_windows[3, pos]
-    right_right_word = sliding_windows[4, pos]
+for position in range(walk_length):
+    left_left_word = sliding_windows[0, position]
+    left_word = sliding_windows[1, position]
+    center_word = sliding_windows[2, position]
+    right_word = sliding_windows[3, position]
+    right_right_word = sliding_windows[4, position]
     # print(center_word)
     # print(left_word)
     # print(right_word)
@@ -314,14 +314,24 @@ def most_similar_vector(c_vec:FloatTensor, vocab: Dict[str, int], vectors: Float
 def update_centroid(centroid, centroid_cnt, added_vector):
     return ((centroid * centroid_cnt) + added_vector)/(centroid_cnt + 1)
 
+# def compute_avg_diff_to_centroid(nodes, word_vectors):
+#     if len(nodes) == 0:
+#         return torch.zeros_like(word_vectors[[0]]).sum()
+#     prt_candidate_vectors = word_vectors[nodes]
+#     prt_candidate_centroid = prt_candidate_vectors.sum(axis=0)/prt_candidate_vectors.shape[0]
+#     candidate_sum_of_centroid_diff = similarities_to_others(prt_candidate_centroid, prt_candidate_vectors)
+#     candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum()/candidate_sum_of_centroid_diff.shape[1]
+#     return candidate_avg_centroid_differences
+
 def compute_avg_diff_to_centroid(nodes, word_vectors):
-    if len(nodes) == 0:
+    if len(nodes) <= 1:
         return torch.zeros_like(word_vectors[[0]]).sum()
     prt_candidate_vectors = word_vectors[nodes]
     prt_candidate_centroid = prt_candidate_vectors.sum(axis=0)/prt_candidate_vectors.shape[0]
-    candidate_sum_of_centroid_diff = similarities_to_others(prt_candidate_centroid, prt_candidate_vectors)
-    candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum()/candidate_sum_of_centroid_diff.shape[1]
+    candidate_sum_of_centroid_diff = torch.dist(prt_candidate_centroid, prt_candidate_vectors)
+    candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum()/len(nodes)
     return candidate_avg_centroid_differences
+
 
 random_prt = dict(enumerate(G.nodes()))
 unique_partitions = np.unique(list(random_prt.values()))
@@ -348,18 +358,23 @@ for node, prt in random_prt.items():
 #     print(vocab[n2])
 #     random_prt[n1]=random_prt[vocab[n2]]
     # tmp_G.add_edge(n1, vocab[n2])
-#%%
-
 statistics = []
+
 for i in range(1):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
     candidates = []
     absolute_movements = []
-    random_node_order = np.random.permutation(list(random_prt.items()))
     current_communities = np.unique(list(random_prt.values()))
-    for node_idx, curr_prt in random_node_order:
+    random_node_order = np.random.permutation(list(random_prt.keys()))
+    for node_idx in random_node_order:
+        # print("")
+        try:
+            random_prt[node_idx]
+        except expression as identifier:
+            pass
+        curr_prt = random_prt[node_idx]
         # print("")
         # print(f"----{node_idx}----")
         store = None
@@ -367,7 +382,7 @@ for i in range(1):
             random_prt[adj_node] 
             for adj_node 
             in list(G[node_idx]) 
-            if random_prt[adj_node] != curr_prt
+            # if random_prt[adj_node] != curr_prt
             )
         empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
         prt_candidates.add(empty_community)
@@ -382,37 +397,46 @@ for i in range(1):
             if community == curr_prt 
             and node != node_idx
         ]
-        curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors)
-        curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors)
+        # print(prt_nodes)
+        curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors) 
+        curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors) 
         # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
-        giver_gain = (curr_avg_diff - curr_avg_diff_with_change)
+        giver_gain = (curr_avg_diff_with_change - curr_avg_diff).cpu().numpy() if len(prt_nodes) != 0 else 0
         # if giver_gain < 0:
         #     # print(f"Giver gain is negative")
         #     continue
+        # print(giver_gain, curr_avg_diff_with_change, curr_avg_diff)
         change_candidates = []
         for idx, prt_candidate in enumerate(prt_candidates):
             
             prt_candidate_nodes = [node for node, community in random_prt.items() if community == prt_candidate]
             candidate_avg_diff = compute_avg_diff_to_centroid(prt_candidate_nodes, word_vectors)
             candidate_avg_diff_with_change = compute_avg_diff_to_centroid(prt_candidate_nodes + [node_idx], word_vectors)
-            receiver_gain = candidate_avg_diff_with_change - candidate_avg_diff
+            receiver_gain = (candidate_avg_diff - candidate_avg_diff_with_change).cpu().numpy()
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             normalizer = len(prt_candidate_nodes)
-            normalizer = 1
+            # normalizer = 1
             change_candidates.append((prt_candidate, (receiver_gain + giver_gain)/normalizer, receiver_gain, giver_gain, normalizer))
             # break
                 
-        maximum_gain = max(change_candidates, key=operator.itemgetter(1))
-        abs_gain = maximum_gain[1].cpu().numpy()
-        receiver_gain = maximum_gain[2].cpu().numpy()
-        giver_gain = maximum_gain[3].cpu().numpy()
+        choose = 1
+        maximum_gain = max(change_candidates, key=operator.itemgetter(choose))
+        # print(maximum_gain[choose])
+        # print(change_candidates) ; break
+        abs_gain = maximum_gain[1]
+        receiver_gain = maximum_gain[2]
+        giver_gain = maximum_gain[3]
         normalizer = maximum_gain[4]
         # print(change_candidates)
-        print(f"\n{node_idx} - {len(change_candidates)} candidates")
+        print("")
+        print(f"{node_idx} - {len(change_candidates)} candidates")
         print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
-        # print(f"Partition {random_prt[node_idx]} chosen. Prev. Partition: {curr_prt}")
+        print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
+        # if maximum_gain[choose] < 0:
+        #     continue
         
         # if receiver_gain + giver_gain > 0:
+        # print(f"Chosen based on {maximum_gain[choose]}")
         random_prt[node_idx] = maximum_gain[0]
         rollier.append(abs_gain)
         rolling_mean = np.mean(rollier)
@@ -420,7 +444,6 @@ for i in range(1):
         # rolling_movements.append(rolling_mean)
         # candidates.append(len(prt_candidates))
         # absolute_movements.append(maximum_gain[1].cpu().numpy())
-        print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
         data_point = {
             "rol":rolling_mean, 
             "receiver_gain":receiver_gain, 
@@ -430,6 +453,7 @@ for i in range(1):
             "partitions":len(set(random_prt.values()))
         }
         statistics.append(data_point)
+    print(f"Final number of partitions is {len(set(random_prt.values()))}")
     # if rolling_mean < 0.04:
     #     break
 
@@ -501,6 +525,16 @@ plt.tight_layout()
 #     partition_counts[prt] += 1
 
 # %%
+def show_subset(prt_id, partition, G, pos, ax=None):
+    subset = {node: prt if prt == prt_id else -1 for node, prt in random_prt.items()}
+    # print(G.nodes())
+    return visualize_benchmark_graph(G, pos, partition=subset)
 
-
+final_unique_partitions = set(random_prt.values())
+final_num = len(final_unique_partitions)
+fig, ax  = plt.subplots(final_num, 1)
+fig.set_size_inches(10, 5 * final_num)
+for prt_id, ax in zip(final_unique_partitions, ax):
+    show_subset(prt_id, random_prt, G, pos, ax)
+plt.tight_layout()
 # %%

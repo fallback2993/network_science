@@ -17,7 +17,7 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics.cluster import normalized_mutual_info_score
 import math 
 import itertools
-from collections import OrderedDict, Counter, deque, defaul
+from collections import OrderedDict, Counter, deque, defaultdict
 import pandas as pd
 import multiprocess as mp
 import matplotlib.cm as cm
@@ -987,7 +987,7 @@ G = nx.barbell_graph(5, 3)
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.1)
-G, pos = generate_benchmark_graph(250,0.1)
+G, pos = generate_benchmark_graph(250,0.7)
 pos = nx.spring_layout(G)
 import pquality
 import pquality.PartitionQuality as pq
@@ -1006,42 +1006,21 @@ def flake_odf_wrapper(partition_map, G):
     node_indegrees = {}
     node_exdegrees = {}
     node_diff = {}
-    # print(partitions)
     for node, community in partition_map.items():
         node_indegrees[node] = sum(True for adj_node in G[node] if partition_map[adj_node] == community)
         node_exdegrees[node] = len(G[node])/2
         node_diff[node] = node_indegrees[node] < node_exdegrees[node]
-        # print(node_diff[node])
         partition_indegrees[community] += int(node_diff[node])
         partition_degrees[community] += 1
 
-    
-    
-
-    # print(partition_degrees)
     fraction = np.array(list(partition_indegrees.values()))/np.array(list(partition_degrees.values()))
-    # plt.plot(sorted(fraction))
     return -fraction.mean()
 
 print(flake_odf_wrapper(true_partition_map, G))
 print(flake_odf_wrapper(dict(enumerate(G)), G))
-flake_odf_wrapper({node:0 for node in G.nodes()}, G)
-
-    # for node, indegrees in node_indegrees.items():
-    # partition_indegrees = {partition: sum([degr for node,degr in node_indegrees.items() if pa]) for partition in partitions} 
-        # partition_degrees[community] += len(G[node])
-    # print(partition_degrees)
-    # for prt in partitions:
-    #     prt_degree = partition_degrees[partition_degrees]
-    #    fr = partition_degrees[partition_degrees] - (g.degree(n) - coms.degree(n)) 
-
-    # def flake_odf(g, coms):
-    #     df = 0
-    #     for n in coms:
-    #         fr = coms.degree(n) - (g.degree(n) - coms.degree(n))
-    #         if fr < 0:
-    #             df += 1
-    #     return float(df)/len(coms)
+print(flake_odf_wrapper({node:0 for node in G.nodes()}, G))
+# print(flake_odf_wrapper({node:0 for node in G.nodes()}, G))
+# tmp_prt = flake_odf_wrapper.copy().setdefault(0, 1)
 
 
 

@@ -9,7 +9,7 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics.cluster import normalized_mutual_info_score
 import math 
 import itertools
-from collections import OrderedDict, Counter
+from collections import OrderedDict, Counter, defaultdict
 import pandas as pd
 from algorithms.map_equation import map_equation
 import community as community_louvain
@@ -124,3 +124,23 @@ def modularity_wrapper(partition, G):
 def coverage_wrapper(partition, G):
     community_map = extract_community_map(partition)
     return algorithms.coverage(G, community_map)
+
+def flake_odf_wrapper(partition_map, G):
+    partitions = np.unique(list(partition_map.values()))
+    if len(partitions) < 2:
+        return -1
+    partition_indegrees = defaultdict(float)
+    partition_degrees = defaultdict(float)
+    node_indegrees = {}
+    node_exdegrees = {}
+    node_diff = {}
+    # print(partitions)
+    for node, community in partition_map.items():
+        node_indegrees[node] = sum(True for adj_node in G[node] if partition_map[adj_node] == community)
+        node_exdegrees[node] = len(G[node])/2
+        node_diff[node] = node_indegrees[node] < node_exdegrees[node]
+        partition_indegrees[community] += int(node_diff[node])
+        partition_degrees[community] += 1
+
+    fraction = np.array(list(partition_indegrees.values()))/np.array(list(partition_degrees.values()))
+    return -fraction.mean()

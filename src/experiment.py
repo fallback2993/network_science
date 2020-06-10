@@ -32,7 +32,7 @@ import community as community_louvain
 import scipy
 from random import random
 import operator
-from utils import post_transform, compute_experiment, modularity_wrapper, map_equation_wrapper, coverage_wrapper
+from utils import post_transform, compute_experiment, modularity_wrapper, flake_odf_wrapper, map_equation_wrapper, coverage_wrapper
 from algorithms.louvain_core import LouvainCoreAlgorithm
 
 def extract_true_communities(G):
@@ -114,8 +114,8 @@ def normalized_mutual_information(true_partitions, pred_partitions):
 def run_experiment(algorithms_for_experiment, backup):
 
     collected_data = []
-    iterations = list(range(0, 7))
-    node_sizes = [500]
+    iterations = list(range(0, 10))
+    node_sizes = [250]
     mus = np.arange(0.1, 0.8, 0.1)
     configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
 
@@ -163,11 +163,13 @@ if __name__ == "__main__":
     louvain_algorithm = LouvainCoreAlgorithm(fitness_function=modularity_wrapper, verbose=True, max_iter=20)
     infomap_algorithm = LouvainCoreAlgorithm(fitness_function=map_equation_wrapper, verbose=True, max_iter=20)
     coverage_algorithm = LouvainCoreAlgorithm(fitness_function=coverage_wrapper, verbose=True, max_iter=20)
+    flake_algorithm = LouvainCoreAlgorithm(fitness_function=flake_odf_wrapper, verbose=True, max_iter=20)
     lblprob_algorithm = post_transform(algorithms.asyn_lpa_communities)
 
     algorithms_for_experiment = {
         # infomap_algorithm.run:"Map Equation",
-        coverage_algorithm.run:"Coverage Maximization",
+        # coverage_algorithm.run:"Coverage Maximization",
+        flake_algorithm.run:"Flake Maximization",
         # lblprob_algorithm:"Labelpropagation Algorithm",
         # louvain_algorithm.run: "Louvain Algorithm",
     }
