@@ -27,7 +27,7 @@ import community as community_louvain
 import scipy
 from random import random
 import operator
-from utils import extract_partition_map, extract_community_map, visualize_benchmark_graph
+from utils import extract_partition_map, extract_community_map, generate_benchmark_graph, visualize_benchmark_graph
 
 import pickle
 import torch
@@ -45,8 +45,8 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 # # G = nx.bull_graph()
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
-G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
-# G, pos = generate_benchmark_graph(250,0.3)
+# G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
+G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
 true_partition_map = community_louvain.best_partition(G)
 lpa_prt = extract_partition_map(algorithms.asyn_lpa_communities(G))
@@ -350,7 +350,7 @@ for node, prt in random_prt.items():
     # tmp_G.add_edge(n1, vocab[n2])
 
 statistics = []
-for i in range(1):
+for i in range(5):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
