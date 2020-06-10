@@ -115,12 +115,12 @@ def run_experiment(algorithms_for_experiment, backup):
 
     collected_data = []
     iterations = list(range(0, 7))
-    node_sizes = [250, 500]
+    node_sizes = [500]
     mus = np.arange(0.1, 0.8, 0.1)
     configuration_set = itertools.product(*[iterations, algorithms_for_experiment.items(), node_sizes, mus])
 
 
-    cpu_cnt = 9
+    cpu_cnt = 8
     print(cpu_cnt)
     # with mp.Pool(cpu_cnt) as pool:
     pool = mp.Pool(processes=cpu_cnt)

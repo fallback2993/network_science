@@ -73,7 +73,7 @@ def random_walk(a, i, iters):
     return walk
 
 # print(pd.DataFrame(nx.adj_matrix(G).todense()))
-walk_length = 100000
+walk_length = 1000000
 markov_matrix = np.array(nx.google_matrix(G, alpha=1))
 nodes = G.nodes()
 vocab = {f"node_{node}":node for node in nodes}
@@ -211,7 +211,7 @@ for word in ['node_0', 'node_6' ,'node_9', 'node_7']:
 # for prt in np.unique(list(true_partition_map.values())):
 all_pairs = list(itertools.permutations(vocab.keys(),2))
 all_pair_scores = list(zip(all_pairs, (similarity(n1, n2, vocab, word_vectors) for n1, n2 in all_pairs)))
-all_pair_scores
+# all_pair_scores
 
 # %%
 edge_proximities = {}
@@ -221,7 +221,7 @@ for n1, n2 in G.edges():
     edge = (n1, n2)
     edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
 
-edge_proximities
+# edge_proximities
 # %%
 partition_aggregation = defaultdict(float)
 partition_counts = defaultdict(float)
@@ -348,15 +348,17 @@ for node, prt in random_prt.items():
 #     print(vocab[n2])
 #     random_prt[n1]=random_prt[vocab[n2]]
     # tmp_G.add_edge(n1, vocab[n2])
+#%%
 
 statistics = []
-for i in range(5):
+for i in range(1):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
     candidates = []
     absolute_movements = []
     random_node_order = np.random.permutation(list(random_prt.items()))
+    current_communities = np.unique(list(random_prt.values()))
     for node_idx, curr_prt in random_node_order:
         # print("")
         # print(f"----{node_idx}----")
@@ -365,8 +367,10 @@ for i in range(5):
             random_prt[adj_node] 
             for adj_node 
             in list(G[node_idx]) 
-            # if random_prt[adj_node] != curr_prt
+            if random_prt[adj_node] != curr_prt
             )
+        empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
+        prt_candidates.add(empty_community)
         if len(prt_candidates) == 0:
             print(f"No candidates")
             continue
@@ -381,42 +385,47 @@ for i in range(5):
         curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors)
         curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors)
         # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
-        giver_gain = (curr_avg_diff - curr_avg_diff_with_change).cpu().numpy().flatten()
+        giver_gain = (curr_avg_diff - curr_avg_diff_with_change)
         # if giver_gain < 0:
         #     # print(f"Giver gain is negative")
         #     continue
         change_candidates = []
         for idx, prt_candidate in enumerate(prt_candidates):
+            
             prt_candidate_nodes = [node for node, community in random_prt.items() if community == prt_candidate]
             candidate_avg_diff = compute_avg_diff_to_centroid(prt_candidate_nodes, word_vectors)
             candidate_avg_diff_with_change = compute_avg_diff_to_centroid(prt_candidate_nodes + [node_idx], word_vectors)
             receiver_gain = candidate_avg_diff_with_change - candidate_avg_diff
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
-            change_candidates.append((prt_candidate, (receiver_gain + giver_gain)/len(prt_candidate_nodes)))
+            normalizer = len(prt_candidate_nodes)
+            normalizer = 1
+            change_candidates.append((prt_candidate, (receiver_gain + giver_gain)/normalizer, receiver_gain, giver_gain, normalizer))
             # break
                 
         maximum_gain = max(change_candidates, key=operator.itemgetter(1))
         abs_gain = maximum_gain[1].cpu().numpy()
+        receiver_gain = maximum_gain[2].cpu().numpy()
+        giver_gain = maximum_gain[3].cpu().numpy()
+        normalizer = maximum_gain[4]
         # print(change_candidates)
-        # print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} => {maximum_gain[1]}")
+        print(f"\n{node_idx} - {len(change_candidates)} candidates")
+        print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
+        # print(f"Partition {random_prt[node_idx]} chosen. Prev. Partition: {curr_prt}")
         
         # if receiver_gain + giver_gain > 0:
         random_prt[node_idx] = maximum_gain[0]
-        # print(f"Partition {random_prt[node_idx]} chosen. Prev. Partition: {curr_prt}")
-        receiver_gain = abs_gain - giver_gain
         rollier.append(abs_gain)
-        
         rolling_mean = np.mean(rollier)
 
         # rolling_movements.append(rolling_mean)
         # candidates.append(len(prt_candidates))
         # absolute_movements.append(maximum_gain[1].cpu().numpy())
-        # print(f"Absolute gain: {abs_gain[0]:.8f} = {receiver_gain[0]:.8f} + {giver_gain[0]:.8f}")
+        print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
         data_point = {
             "rol":rolling_mean, 
-            "receiver_gain":receiver_gain[0], 
-            "giver_gain":giver_gain[0], 
-            "abs": abs_gain[0], 
+            "receiver_gain":receiver_gain, 
+            "giver_gain":giver_gain, 
+            "abs": abs_gain, 
             "candidates":len(prt_candidates),
             "partitions":len(set(random_prt.values()))
         }
@@ -449,7 +458,7 @@ data = pd.DataFrame(statistics)
 # print("")
 # print(random_prt)
 fig, ax = plt.subplots(7,1)
-fig.set_size_inches(5, 15)
+fig.set_size_inches(10, 20)
 visualize_benchmark_graph(G, nx.spring_layout(G), random_prt, ax=ax[0])
 ax[1].plot(data["giver_gain"])
 ax[2].plot(data["receiver_gain"])
