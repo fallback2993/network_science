@@ -1,3 +1,4 @@
+method,N,µ,NMI
 Labelpropagation Algorithm, 250, 0.2, 0.7181832729864346
 Labelpropagation Algorithm, 250, 0.1, 1.0
 Labelpropagation Algorithm, 250, 0.30000000000000004, 0.0
@@ -749,3 +750,5 @@ Flake Maximization, 250, 0.4, 0.5384428449381987
 Flake Maximization, 250, 0.5, 0.5384428449381987
 Flake Maximization, 250, 0.6, 0.5384428449381988
 Flake Maximization, 250, 0.7000000000000001, 0.5384428449381988
+Conductance Maximization, 250, 0.1, 0.12414051666533095
+Conductance Maximization, 250, 0.2, 0.0951484365412197
