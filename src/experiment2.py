@@ -45,8 +45,8 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 # # G = nx.bull_graph()
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
-G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
-# G, pos = generate_benchmark_graph(250,0.1)
+# G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.05)
+G, pos = generate_benchmark_graph(250,0.1)
 pos = nx.spring_layout(G)
 true_partition_map = community_louvain.best_partition(G)
 lpa_prt = extract_partition_map(algorithms.asyn_lpa_communities(G))
@@ -359,8 +359,8 @@ for node, prt in random_prt.items():
 #     random_prt[n1]=random_prt[vocab[n2]]
     # tmp_G.add_edge(n1, vocab[n2])
 statistics = []
-
-for i in range(1):
+#%%
+for i in range(10):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
@@ -397,7 +397,9 @@ for i in range(1):
         curr_avg_diff = compute_avg_diff_to_centroid(prt_nodes + [node_idx], word_vectors) 
         curr_avg_diff_with_change = compute_avg_diff_to_centroid(prt_nodes, word_vectors) 
         # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
-        giver_gain = (curr_avg_diff_with_change - curr_avg_diff).cpu().numpy() if len(prt_nodes) != 0 else 0
+        giver_normalizer = len(prt_nodes)
+        giver_normalizer = 1
+        giver_gain = (curr_avg_diff_with_change - curr_avg_diff).cpu().numpy()/giver_normalizer if len(prt_nodes) != 0 else 0
         # if giver_gain < 0:
         #     # print(f"Giver gain is negative")
         #     continue
@@ -410,9 +412,9 @@ for i in range(1):
             candidate_avg_diff_with_change = compute_avg_diff_to_centroid(prt_candidate_nodes + [node_idx], word_vectors)
             receiver_gain = (candidate_avg_diff - candidate_avg_diff_with_change).cpu().numpy()
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
-            normalizer = len(prt_candidate_nodes)
-            # normalizer = 1
-            change_candidates.append((prt_candidate, (receiver_gain/normalizer + giver_gain), receiver_gain, giver_gain, normalizer))
+            receiver_normalizer = len(prt_candidate_nodes)
+            normalizer = 1
+            change_candidates.append((prt_candidate, (receiver_gain*giver_gain/receiver_normalizer), receiver_gain, giver_gain, normalizer))
             # break
                 
         choose = 1
@@ -479,7 +481,7 @@ data = pd.DataFrame(statistics)
 # print(random_prt)
 fig, ax = plt.subplots(7,1)
 fig.set_size_inches(10, 50)
-visualize_benchmark_graph(G, nx.spring_layout(G), random_prt, ax=ax[0])
+visualize_benchmark_graph(G, pos, random_prt, ax=ax[0])
 ax[1].plot(data["giver_gain"])
 ax[2].plot(data["receiver_gain"])
 ax[3].plot(data["abs"])
@@ -520,7 +522,7 @@ plt.tight_layout()
 #     partition_aggregation[prt] += sim
 #     partition_counts[prt] += 1
 
-# %%
+ # %%
 
 def show_subset(prt_id, partition, G, pos, ax=None):
     subset = {node: prt if prt == prt_id else -1 for node, prt in random_prt.items()}
