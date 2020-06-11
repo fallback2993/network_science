@@ -414,7 +414,7 @@ for i in range(25):
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             receiver_normalizer = len(prt_candidate_nodes)
             # normalizer = 1
-            change_candidates.append((prt_candidate, (receiver_gain*giver_gain*receiver_normalizer), receiver_gain, giver_gain, normalizer))
+            change_candidates.append((prt_candidate, (receiver_gain*giver_gain*receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
             # break
                 
         choose = 1
@@ -524,8 +524,10 @@ plt.tight_layout()
 
  # %%
 
+
+
 def show_subset(prt_id, partition, G, pos, ax=None):
-    subset = {node: prt if prt == prt_id else -1 for node, prt in random_prt.items()}
+    subset = {node: 1 if prt == prt_id else -1  for node, prt in random_prt.items()}
     # print(G.nodes())
     return visualize_benchmark_graph(G, pos, partition=subset, ax=ax)
 
@@ -533,7 +535,7 @@ def show_all_identified_partitions(random_prt, G, pos):
     final_unique_partitions = set(random_prt.values())
     final_num = len(final_unique_partitions)
     fig, ax  = plt.subplots(final_num, 1)
-    fig.set_size_inches(10, 5 * final_num)
+    fig.set_size_inches(5, 5 * final_num)
     for prt_id, ax in zip(final_unique_partitions, ax):
         ax.set_title(f"Partition {prt_id}")
         show_subset(prt_id, random_prt, G, pos, ax)
@@ -541,6 +543,26 @@ def show_all_identified_partitions(random_prt, G, pos):
 
 show_all_identified_partitions(random_prt, G, pos)
 # %%
+# Hot is so far the best
+# brg is nice
+# prism is good
+
+# %%
+def visualize_benchmark_graph(G, pos, partition = None, ax=None):
+    if partition:
+        prt2idx = {key: idx for idx, key in enumerate(set(partition.values()))}
+        partition = {node:prt2idx[prt] for node, prt in partition.items()}
+        cmap = cm.get_cmap('jet', max(set(partition.values())) + 1)
+        # cmap = cm.get_cmap('brg', 255)
+        # print(cmap)
+        nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
+                            cmap=cmap, node_color=list(partition.values()), ax=ax)
+        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
+    else:
+        nx.draw_networkx_nodes(G, pos, node_size=40, ax=ax)
+        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
+    return None 
+visualize_benchmark_graph(G, pos, random_prt)
 
 
 # %%

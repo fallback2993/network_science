@@ -48,7 +48,7 @@ def generate_benchmark_graph(n, mu=0.1):
 
 def visualize_benchmark_graph(G, pos, partition = None, ax=None):
     if partition:
-        cmap = cm.get_cmap('viridis', max(partition.values()) + 1)
+        cmap = cm.get_cmap('hsv', max(partition.values()) + 1)
         nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
                             cmap=cmap, node_color=list(partition.values()), ax=ax)
         nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
