@@ -359,7 +359,7 @@ for node, prt in random_prt.items():
 #     random_prt[n1]=random_prt[vocab[n2]]
     # tmp_G.add_edge(n1, vocab[n2])
 statistics = []
-#%%
+
 for i in range(25):
     rollier = deque(maxlen=10)
     # rollier.append(1)
@@ -378,7 +378,7 @@ for i in range(25):
             random_prt[adj_node] 
             for adj_node 
             in list(G[node_idx]) 
-            if random_prt[adj_node] != curr_prt
+            # if random_prt[adj_node] != curr_prt
             )
         empty_community = next(iter(set(range(min(current_communities), max(current_communities)+2)) - set(current_communities)))
         prt_candidates.add(empty_community)
@@ -414,7 +414,7 @@ for i in range(25):
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             receiver_normalizer = len(prt_candidate_nodes)
             # normalizer = 1
-            change_candidates.append((prt_candidate, (receiver_gain*giver_gain*receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
+            change_candidates.append((prt_candidate, ((receiver_gain*giver_gain)/receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
             # break
                 
         choose = 1
@@ -430,7 +430,7 @@ for i in range(25):
         # print(f"{node_idx} - {len(change_candidates)} candidates")
         # print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
         # print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
-        # if maximum_gain[choose] < 0:
+        # if maximum_gain[choose] > 0:
         #     continue
         
         # if receiver_gain + giver_gain > 0:
@@ -548,20 +548,7 @@ show_all_identified_partitions(random_prt, G, pos)
 # prism is good
 
 # %%
-def visualize_benchmark_graph(G, pos, partition = None, ax=None):
-    if partition:
-        prt2idx = {key: idx for idx, key in enumerate(set(partition.values()))}
-        partition = {node:prt2idx[prt] for node, prt in partition.items()}
-        cmap = cm.get_cmap('jet', max(set(partition.values())) + 1)
-        # cmap = cm.get_cmap('brg', 255)
-        # print(cmap)
-        nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
-                            cmap=cmap, node_color=list(partition.values()), ax=ax)
-        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
-    else:
-        nx.draw_networkx_nodes(G, pos, node_size=40, ax=ax)
-        nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
-    return None 
+
 visualize_benchmark_graph(G, pos, random_prt)
 
 

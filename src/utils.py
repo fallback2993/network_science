@@ -48,14 +48,16 @@ def generate_benchmark_graph(n, mu=0.1):
 
 def visualize_benchmark_graph(G, pos, partition = None, ax=None):
     if partition:
-        cmap = cm.get_cmap('hsv', max(partition.values()) + 1)
+        prt2idx = {key: idx for idx, key in enumerate(set(partition.values()))}
+        partition = {node:prt2idx[prt] for node, prt in partition.items()}
+        cmap = cm.get_cmap('jet', max(set(partition.values())) + 1)
         nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
                             cmap=cmap, node_color=list(partition.values()), ax=ax)
         nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
     else:
         nx.draw_networkx_nodes(G, pos, node_size=40, ax=ax)
         nx.draw_networkx_edges(G, pos, alpha=0.5, ax=ax)
-    return None
+    return None 
 
 def sort_partition_map(partition_map):
     return dict(sorted(partition_map.items())) 
