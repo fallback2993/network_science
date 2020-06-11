@@ -360,7 +360,7 @@ for node, prt in random_prt.items():
     # tmp_G.add_edge(n1, vocab[n2])
 statistics = []
 #%%
-for i in range(10):
+for i in range(25):
     rollier = deque(maxlen=10)
     # rollier.append(1)
     rolling_movements = []
@@ -413,8 +413,8 @@ for i in range(10):
             receiver_gain = (candidate_avg_diff - candidate_avg_diff_with_change).cpu().numpy()
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             receiver_normalizer = len(prt_candidate_nodes)
-            normalizer = 1
-            change_candidates.append((prt_candidate, (receiver_gain*giver_gain/receiver_normalizer), receiver_gain, giver_gain, normalizer))
+            # normalizer = 1
+            change_candidates.append((prt_candidate, (receiver_gain*giver_gain*receiver_normalizer), receiver_gain, giver_gain, normalizer))
             # break
                 
         choose = 1
@@ -480,7 +480,7 @@ data = pd.DataFrame(statistics)
 # print("")
 # print(random_prt)
 fig, ax = plt.subplots(7,1)
-fig.set_size_inches(10, 50)
+fig.set_size_inches(10, 25)
 visualize_benchmark_graph(G, pos, random_prt, ax=ax[0])
 ax[1].plot(data["giver_gain"])
 ax[2].plot(data["receiver_gain"])
