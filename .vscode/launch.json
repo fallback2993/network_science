@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: small",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/experiment_small.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: big",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/experiment.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}

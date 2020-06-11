@@ -95,9 +95,6 @@ for position in range(walk_length):
     center_word = sliding_windows[2, position]
     right_word = sliding_windows[3, position]
     right_right_word = sliding_windows[4, position]
-    # print(center_word)
-    # print(left_word)
-    # print(right_word)
     cooccurence_matrix[center_word,left_word] += 1
     cooccurence_matrix[center_word,right_word] += 1
     cooccurence_matrix[center_word,left_left_word] += 1
@@ -176,6 +173,7 @@ for i in range(num_epochs):
 
 plt.plot(np.array(all_losses))
 
+
 # %%
 def similarity(word_i: str, word_j: str, vocab: Dict[str, int], vectors: FloatTensor) -> float:
     i = vocab[word_i]
@@ -189,10 +187,11 @@ def similarity(word_i: str, word_j: str, vocab: Dict[str, int], vectors: FloatTe
 def similarities(word_i: str, vocab: Dict[str, int], vectors: FloatTensor) -> FloatTensor:
     i = vocab[word_i]
     comparison_vector = vectors[i]
-    inner_products = torch.mm(comparison_vector.view(1,-1), vectors.transpose(0,1))
+    inner_products = torch.mm(comparison_vector.view(1, -1), vectors.transpose(0, 1))
     matrix_norms = torch.norm(vectors, p=2, dim=1)
     comparison_norm = torch.norm(comparison_vector, p=2)
-    return inner_products/(comparison_norm*matrix_norms)
+    return inner_products / (comparison_norm * matrix_norms)
+
 
 def most_similar(word_i: str, vocab: Dict[str, int], vectors: FloatTensor, k: int) -> List[str]:
     sims = similarities(word_i, vocab, vectors)
@@ -413,28 +412,16 @@ for i in range(25):
             receiver_gain = (candidate_avg_diff - candidate_avg_diff_with_change).cpu().numpy()
             # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
             receiver_normalizer = len(prt_candidate_nodes)
-            # normalizer = 1
             change_candidates.append((prt_candidate, ((receiver_gain*giver_gain)/receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
-            # break
                 
         choose = 1
         maximum_gain = max(change_candidates, key=operator.itemgetter(choose))
-        # print(maximum_gain[choose])
-        # print(change_candidates) ; break
+
         abs_gain = maximum_gain[1]
         receiver_gain = maximum_gain[2]
         giver_gain = maximum_gain[3]
         normalizer = maximum_gain[4]
-        # print(change_candidates)
-        # print("")
-        # print(f"{node_idx} - {len(change_candidates)} candidates")
-        # print(f"Change node {node_idx} partition {curr_prt} -> {maximum_gain[0]} : {maximum_gain[1]}")
-        # print(f"Absolute gain: {abs_gain:.8f} = ({receiver_gain:.8f} + {giver_gain:.8f}) / {normalizer}")
-        # if maximum_gain[choose] > 0:
-        #     continue
-        
-        # if receiver_gain + giver_gain > 0:
-        # print(f"Chosen based on {maximum_gain[choose]}")
+
         random_prt[node_idx] = maximum_gain[0]
         rollier.append(abs_gain)
         rolling_mean = np.mean(rollier)
@@ -456,29 +443,7 @@ for i in range(25):
     #     break
 
 data = pd.DataFrame(statistics)
-# # partition_centroids = partition_sums/partition_counts[prt]
 
-# before_change = random_prt.copy()
-# for prt_idx, (prt_sum, prt_count) in enumerate(zip(partition_sums, partition_counts)):
-#     if prt_count==0:
-#         continue
-#     prt_centroid = prt_sum/prt_count
-#     prt_nodes = [node for node, community in random_prt.items() if community == prt_idx]
-#     node, diff_to_centroid, node_idx = most_similar_vector(prt_centroid, vocab, word_vectors, prt_nodes)
-#     node_idx = vocab[node]
-#     prev_prt = random_prt[node_idx]
-#     node_vector = word_vectors[node_idx]
-#     random_prt[node_idx] = prt_idx
-#     partition_sums[prt_idx] += node_vector
-#     partition_counts[prt_idx] += 1
-#     partition_sums[prev_prt] -= node_vector
-#     partition_counts[prev_prt] -= 1
-
-# print(before_change)
-# print("")
-# print(other_copy)
-# print("")
-# print(random_prt)
 fig, ax = plt.subplots(7,1)
 fig.set_size_inches(10, 25)
 visualize_benchmark_graph(G, pos, random_prt, ax=ax[0])
@@ -495,36 +460,9 @@ ax[4].set_title("rol")
 ax[5].set_title("candidates")
 ax[6].set_title("partitions")
 plt.tight_layout()
-# def most_similar(word_i: str, vocab: Dict[str, int], vectors: FloatTensor, k: int) -> List[str]:
-#     sims = similarities(word_i, vocab, vectors)
-#     _, topi = sims.topk(dim=-1, k=k)
-#     topi = topi.view(-1).cpu().numpy().tolist()
-#     inv = {v: i for i, v in vocab.items()}
-#     return [inv[i] for i in topi if inv[i] != word_i]
 
-
-# for n1, n2 in G.edges():
-#     # print(n1, n2)
-#     prt = "_".join(set((str(random_prt[n1]), str(random_prt[n2]))))
-#     edge = (n1, n2)
-#     edge_proximities[(n1, n2, prt)] = similarity(n2voc[n1], n2voc[n2], vocab, word_vectors)
-    # most_sim = most_similar(n2voc[n1], vocab, word_vectors, 1)
-    
-
-# tmp_G = nx.Graph()
-
-
-# tmp_pos = nx.spring_layout(tmp_G)
-# nx.draw_networkx(tmp_G, tmp_pos, edgecolors="black", node_size=600, cmap=plt.cm.RdYlBu, node_color=list(true_partition_map.values()))
-
-# partition_aggregation = defaultdict(float)
-# for (n1, n2, prt), sim in edge_proximities.items():
-#     partition_aggregation[prt] += sim
-#     partition_counts[prt] += 1
 
  # %%
-
-
 
 def show_subset(prt_id, partition, G, pos, ax=None):
     subset = {node: 1 if prt == prt_id else -1  for node, prt in random_prt.items()}
@@ -542,14 +480,6 @@ def show_all_identified_partitions(random_prt, G, pos):
     return plt.tight_layout()
 
 show_all_identified_partitions(random_prt, G, pos)
-# %%
-# Hot is so far the best
-# brg is nice
-# prism is good
-
-# %%
-
-visualize_benchmark_graph(G, pos, random_prt)
 
 
 # %%

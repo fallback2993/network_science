@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics.cluster import normalized_mutual_info_score
-import math 
+import math
 import itertools
 from collections import OrderedDict, Counter, deque, defaultdict
 import pandas as pd
@@ -17,22 +17,30 @@ import community as community_louvain
 import scipy
 from random import random
 import operator
-from utils import extract_partition_map, extract_community_map
+from helper.utils import extract_partition_map, extract_community_map
 
 import pickle
 import torch
 from torch import FloatTensor, LongTensor
 from typing import Dict, Callable, List
-import numpy as np
-import matplotlib.pyplot as plt
+from algorithms.louvain_core import LouvainCoreAlgorithm
 
-class GloveMaximization(LouvainCoreAlgorithm):
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+
+class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
+    walk_length = None
+    level_word_vectors = None
+
+    def __init__(self, max_iter=20, fitness_function=community_louvain.modularity, verbose=False, max_local_movements=100, stop_after=-1, walk_length=int(1e5)):
+        self.walk_length = walk_length
+        super().__init__(max_iter=max_iter, fitness_function=fitness_function, verbose=verbose, max_local_movements=max_local_movements, stop_after=stop_after)
+
     def initialize(self, G):
         initial_partition_map = dict(enumerate(G.nodes()))
         self.levels = []
-        self.stats = {
-            "local_moving":[]
-        }
+        self.level_word_vectors = []
+        self.stats = {"local_moving": [], "cooccurence_matrices": []}
         self.levels.append(initial_partition_map)
         # initial_fitness = self.fitness_function(initial_partition_map, G)
         # self.null_fitness.append(initial_fitness)
@@ -42,119 +50,236 @@ class GloveMaximization(LouvainCoreAlgorithm):
         return G, initial_partition_map
 
     def local_movement(self, G, partition_map):
+        # print(G.nodes())
 
-        p_a_i, q_out_i, q_out, p_circle_i, p_u, partition_map, community_map = map_equation_essentials(G, partition_map)
-        H_Q = - sum(np.nan_to_num((q_out_i/q_out) * np.log2(q_out_i/q_out)))
-        term1 = -np.nan_to_num((q_out_i/p_circle_i)*np.log2((q_out_i/p_circle_i)))
-        term2 = np.zeros(num_partitions)
-        for name, community in community_map.items():
-            term2[name] = -compute_weighted_entropy(p_u[community], p_circle_i[name])
-        
-        H_P_i = term1 + term2
-        index_codelength = q_out * H_Q 
-        module_codelength = p_circle_i.dot(H_P_i)
-        L = index_codelength + module_codelength 
-        L = np.asarray(L).flatten()[0]
+        if len(G.nodes()) <= 1:
+            return partition_map, 0
+        num_changes = 0
+        cnt = 0
+        node2id = dict({node: idx for idx, node in enumerate(G.nodes())})
+        id2node = dict(enumerate(node2id.keys()))
+        comm2id = dict({community: idx for idx, community in enumerate(set(partition_map.values()))})
+        id2comm = dict(enumerate(comm2id.keys()))
+        # partition_matrix = np.zeros((num_nodes, num_partitions))
+        partition_map_copy = {node2id[node]: comm2id[community] for node, community in partition_map.items()}
+        G = nx.relabel_nodes(G, node2id)
+        # initial_labels = np.array(list(partition_map.values()))
 
-        
+        word_vectors = self.build_model(G)
+
         while True:
-            random_order = np.random.permutation(G.nodes()) 
-            had_improvement = False
-            for node in random_order:            
-                pass
+            rollier = deque(maxlen=10)
+            # rollier.append(1)
+            current_communities = np.unique(list(partition_map_copy.values()))
+            random_node_order = np.random.permutation(list(partition_map_copy.keys()))
+            for node_idx in random_node_order:
+                # print("")
+                curr_prt = partition_map_copy[node_idx]
+                # print("")
+                # print(f"----{node_idx}----")
+                prt_candidates = set(partition_map_copy[adj_node] for adj_node in list(G[node_idx])
+                                     #  if partition_map_copy[adj_node] != curr_prt
+                                     )
+                empty_community = next(iter(set(range(min(current_communities), max(current_communities) + 2)) - set(current_communities)))
+                prt_candidates.add(empty_community)
+                if len(prt_candidates) == 0:
+                    print(f"No candidates")
+                    continue
+                # print(f"{len(prt_candidates)} candidates")
+                prt_nodes = [node for node, community in partition_map_copy.items() if community == curr_prt and node != node_idx]
+                # print(prt_nodes)
+                curr_avg_diff = self._L2_distance(prt_nodes + [node_idx], word_vectors)
+                curr_avg_diff_with_change = self._L2_distance(prt_nodes, word_vectors)
+                # print(f"Node {node_idx} curr partition {curr_prt}: {curr_avg_diff} -> {curr_avg_diff_with_change}")
+                giver_normalizer = len(prt_nodes)
+                giver_normalizer = 1
+                giver_gain = (curr_avg_diff_with_change - curr_avg_diff).cpu().numpy() / giver_normalizer if len(prt_nodes) != 0 else 0
+                # if giver_gain < 0:
+                #     # print(f"Giver gain is negative")
+                #     continue
+                # print(giver_gain, curr_avg_diff_with_change, curr_avg_diff)
+                change_candidates = []
+                for idx, prt_candidate in enumerate(prt_candidates):
 
+                    prt_candidate_nodes = [node for node, community in partition_map_copy.items() if community == prt_candidate]
+                    candidate_avg_diff = self._L2_distance(prt_candidate_nodes, word_vectors)
+                    candidate_avg_diff_with_change = self._L2_distance(prt_candidate_nodes + [node_idx], word_vectors)
+                    receiver_gain = (candidate_avg_diff - candidate_avg_diff_with_change).cpu().numpy()
+                    # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
+                    receiver_normalizer = len(prt_candidate_nodes)
+                    receiver_normalizer = 1
 
+                    change_candidates.append((prt_candidate, ((receiver_gain * giver_gain) / receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
 
+                choose = 1
+                maximum_gain = max(change_candidates, key=operator.itemgetter(choose))
 
+                abs_gain = maximum_gain[1]
+                receiver_gain = maximum_gain[2]
+                giver_gain = maximum_gain[3]
+                receiver_normalizer = maximum_gain[4]
+                # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
 
-        resulting_map = {id2node[node]: id2comm[community] for node, community in partition_map_copy.items()}
+                partition_map_copy[node_idx] = maximum_gain[0]
+                rollier.append(abs_gain)
+                rolling_mean = np.mean(rollier)
+
+                # rolling_movements.append(rolling_mean)
+                # candidates.append(len(prt_candidates))
+                # absolute_movements.append(maximum_gain[1].cpu().numpy())
+                data_point = {
+                    "rol": rolling_mean,
+                    "receiver_gain": receiver_gain,
+                    "giver_gain": giver_gain,
+                    "normalizer": receiver_normalizer,
+                    "abs": abs_gain,
+                    "candidates": len(partition_map_copy),
+                    "partitions": len(set(partition_map_copy.values()))
+                }
+                self.stats["local_moving"].append(data_point)
+
+                num_changes += 1
+            print(f"Number of partitions is {len(set(partition_map_copy.values()))}")
+            cnt += 1
+            if cnt >= self.max_iter:
+                print(f"Max iteration reached: {cnt}")
+                break
+
+        resulting_map = {id2node[node]: community for node, community in partition_map_copy.items()}
+        # resulting_map = partition_map_copy.copy()
         print(f"Number of changes {num_changes}")
         return resulting_map, num_changes
+
+    def build_model(self, G):
+        sliding_windows, _, _ = self._sample_graph(G)
+        cooccurence_matrix = self._create_coorccurence_matrix(sliding_windows, G)
+        X = torch.tensor(cooccurence_matrix)
+        X = X.to(device)  # If GPU enabled
+        X = X.to(torch.float64) + 0.1
+        X_weighted = self._weight_fn(X, 100, 0.75)
+        X_weighted = X_weighted.to(device)
+        word_vectors = self._train(X=X, X_weighted=X_weighted)
+        self.level_word_vectors.append(word_vectors)
+        return word_vectors
 
     def _random_walk(self, a, i, iters):
         # a -> adj
         # i -> starting row
-        walk = np.zeros(iters+1) # holds transitions
+        walk = np.zeros(iters + 1)  # holds transitions
         walk[0] = i
-        elements = np.arange(a.shape[0]) # for our graph [0,1,2,3]
-        c_index = i # current index for this iteration
+        elements = np.arange(a.shape[0])  # for our graph [0,1,2,3]
+        c_index = i  # current index for this iteration
         for k in range(iters):
-            count = 0 # count of transitions
-            probs = a[c_index].reshape((-1,))  # probability of transitions
+            probs = a[c_index].reshape((-1, ))  # probability of transitions
             # sample from probs
-            sample = np.random.choice(elements,p=probs) # sample a target using probs
-            index = sample # go to target
-            walk[k+1] = index
+            sample = np.random.choice(elements, p=probs)  # sample a target using probs
+            index = sample  # go to target
+            walk[k + 1] = index
             c_index = index
         return walk
-    
-    def _sample_graph(self, G, partition_map):
+
+    def _sample_graph(self, G):
         walk_length = self.walk_length
         markov_matrix = np.array(nx.google_matrix(G, alpha=1))
         nodes = G.nodes()
-        vocab = {f"node_{node}":node for node in nodes}
-        n2voc = {node:name for name, node in vocab.items()}
+        vocab = {f"node_{node}": node for node in nodes}
+        n2voc = {node: name for name, node in vocab.items()}
         starting_point = np.random.choice(nodes)
         walk = self._random_walk(markov_matrix, starting_point, walk_length)
-        sliding_windows = np.vstack((walk,np.roll(walk, -1), np.roll(walk, -2))).astype(np.int)
-        return sliding_windows
+        sliding_windows = np.vstack((walk, np.roll(walk, -1), np.roll(walk, -2), np.roll(walk, -3), np.roll(walk, -4))).astype(np.int)
+        return sliding_windows, vocab, n2voc
 
-    def _create_coorccurence_matrix(self, sample):
-        cooccurence_matrix = np.zeros_like(nx.adjacency_matrix(self.G))
-        center_node_pos = int(sample.shape[0]/2)
-        for pos in range(walk_length):
-            left_word = sliding_windows[0, pos]
-            center_word = sliding_windows[1, pos]
-            right_word = sliding_windows[2, pos]
-            cooccurence_matrix[center_word,left_word] += 1
-            cooccurence_matrix[center_word,right_word] += 1
+    def _create_coorccurence_matrix(self, sliding_windows, G):
+        cooccurence_matrix = np.zeros_like(nx.adjacency_matrix(G).todense())
 
+        for position in range(self.walk_length):
+            left_left_word = sliding_windows[0, position]
+            left_word = sliding_windows[1, position]
+            center_word = sliding_windows[2, position]
+            right_word = sliding_windows[3, position]
+            right_right_word = sliding_windows[4, position]
+            # print(cooccurence_matrix.shape)
+            cooccurence_matrix[center_word, left_word] += 1
+            cooccurence_matrix[center_word, right_word] += 1
+            cooccurence_matrix[center_word, left_left_word] += 1
+            cooccurence_matrix[center_word, right_right_word] += 1
+
+        self.stats["cooccurence_matrices"].append(pd.DataFrame(cooccurence_matrix))
         return cooccurence_matrix
-    
-    def _train(self):
+
+    def _train(self, X_weighted, X):
         num_epochs = 300
         all_losses = []
-        network = GloVe(vocab=vocab,vector_dimensionality=30, device=device)
-        opt = torch.optim.Adam(network.parameters(), lr=0.05) 
+        num_nodes = X_weighted.shape[0]
+        network = GloVe(num_nodes=num_nodes, vector_dimensionality=30, device=device)
+        opt = torch.optim.Adam(network.parameters(), lr=0.05)
 
         for i in range(num_epochs):
-            loss = network.forward(X_weighted, X) # backward
+            loss = network.forward(X_weighted, X)  # backward
             value = loss.data.cpu().numpy()
             if i % 20 == 0:
                 print(f"Epoch: {i} - Loss is currently at: {loss}")
             all_losses.append(value)
             loss.backward()
             opt.step()
-            opt.zero_grad()  
+            opt.zero_grad()
+
+        word_vectors = network.get_vectors().detach()
+        return word_vectors
+
+    def _weight_fn(self, X: FloatTensor, x_max: int, a: float) -> FloatTensor:
+        result = torch.where(X < x_max, torch.pow(X / x_max, 0.75), torch.ones_like(X))
+        return result
+
+    def _cosine_similarity(self, nodes, word_vectors):
+        if len(nodes) == 0:
+            return torch.zeros_like(word_vectors[[0]]).sum()
+        prt_candidate_vectors = word_vectors[nodes]
+        prt_candidate_centroid = prt_candidate_vectors.sum(axis=0) / prt_candidate_vectors.shape[0]
+        comparison_vector = prt_candidate_centroid
+        inner_products = torch.mm(comparison_vector.view(1, -1), prt_candidate_vectors.transpose(0, 1))
+        matrix_norms = torch.norm(prt_candidate_vectors, p=2, dim=1)
+        comparison_norm = torch.norm(comparison_vector, p=2)
+        candidate_sum_of_centroid_diff = inner_products / (comparison_norm * matrix_norms)
+        candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum() / candidate_sum_of_centroid_diff.shape[1]
+        return candidate_avg_centroid_differences
+
+    def _L2_distance(self, nodes, word_vectors):
+        if len(nodes) <= 1:
+            return torch.zeros_like(word_vectors[[0]]).sum()
+        prt_candidate_vectors = word_vectors[nodes]
+        prt_candidate_centroid = prt_candidate_vectors.sum(axis=0) / prt_candidate_vectors.shape[0]
+        candidate_sum_of_centroid_diff = torch.dist(prt_candidate_centroid, prt_candidate_vectors)
+        candidate_avg_centroid_differences = candidate_sum_of_centroid_diff.sum() / len(nodes)
+        return candidate_avg_centroid_differences
+
 
 class GloVe(torch.nn.Module):
-    def __init__(self, vocab: Dict[str, int], vector_dimensionality: int=30, device: str='cpu') -> None:
+    def __init__(self, num_nodes: int, vector_dimensionality: int = 30, device: str = 'cpu') -> None:
         super(GloVe, self).__init__()
         self.device = device
-        self.vocab_len = len(vocab)
-        self.w = torch.nn.Embedding(num_embeddings = self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
-        self.wc = torch.nn.Embedding(num_embeddings = self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
+        self.vocab_len = num_nodes
+        self.w = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
+        self.wc = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=vector_dimensionality).to(self.device)
         self.b = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=1).to(self.device)
         self.bc = torch.nn.Embedding(num_embeddings=self.vocab_len, embedding_dim=1).to(self.device)
-        
+
     def forward(self, X_weighted: FloatTensor, X: FloatTensor) -> FloatTensor:
         embedding_input = torch.arange(self.vocab_len).to(self.device)
         W = self.w(embedding_input)
         W_context = self.wc(embedding_input)
         B = self.b(embedding_input)
         B_context = self.bc(embedding_input)
-        return loss_fn(X_weighted, W, W_context,B, B_context, X, self.device)
-    
+        return self._loss_fn(X_weighted, W, W_context, B, B_context, X, self.device)
+
     def get_vectors(self) -> FloatTensor:
         embedding_input = torch.arange(self.vocab_len).to(self.device)
         return self.w(embedding_input) + self.wc(embedding_input)
 
-def loss_fn(X_weighted: FloatTensor, W: FloatTensor, W_context: FloatTensor, 
-            B: FloatTensor, B_context: FloatTensor, 
-            X: FloatTensor, device:str = "cpu") -> FloatTensor:
-    hypothesis = (torch.mm(W, W_context.transpose(0,1))  + B + B_context).type(torch.DoubleTensor).to(device)
-    target = torch.log(X)
-    squared_loss = ((hypothesis - target)**2)
-    temp = torch.mul(X_weighted, squared_loss)
-    result = torch.sum(temp)
-    return result
+    def _loss_fn(self, X_weighted: FloatTensor, W: FloatTensor, W_context: FloatTensor, B: FloatTensor, B_context: FloatTensor, X: FloatTensor, device: str = "cpu") -> FloatTensor:
+        hypothesis = (torch.mm(W, W_context.transpose(0, 1)) + B + B_context).type(torch.DoubleTensor).to(device)
+        target = torch.log(X)
+        squared_loss = ((hypothesis - target)**2)
+        temp = torch.mul(X_weighted, squared_loss)
+        result = torch.sum(temp)
+        return result

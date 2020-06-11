@@ -17,10 +17,7 @@ class HierarchicalLabelPropagation(LouvainCoreAlgorithm):
         return G, initial_partition_map
 
     def local_movement(self, G, partition_map):
-        # partition_map_copy = partition_map.copy()
-        print("")
-        print("INPUT")
-        print(partition_map)
+
         num_changes = 0
         partitions = np.unique(list(partition_map.values()))
         num_partitions = len(partitions)
@@ -35,12 +32,7 @@ class HierarchicalLabelPropagation(LouvainCoreAlgorithm):
         partition_matrix = np.zeros((num_nodes, num_partitions))
         partition_map_copy = {node2id[node]: comm2id[community] for node, community in partition_map.items()}
         initial_labels = np.array(list(partition_map.values()))
-        # print("Initial nodes")
-        # print(G.nodes())
-        # while True:
-            # random_order = np.random.permutation(G.nodes()) 
-            # had_improvement = False
-            # for node in random_order:            
+           
         for node, community in np.random.permutation(list(partition_map_copy.items())):
             adj_partitions = [
                     partition_map_copy[node2id[adjacent_node]] 
@@ -57,25 +49,7 @@ class HierarchicalLabelPropagation(LouvainCoreAlgorithm):
         initial_labels = new_labels
         num_changes = changes.sum()
 
-
-
-
-
         resulting_map = {id2node[node]: id2comm[community] for node, community in partition_map_copy.items()}
-        # sub_groups = {}
-        # for prt in np.unique(list(resulting_map.values())):
-        #     sub_prt = {node:community for node, community in resulting_map.items() if community == prt}
-        #     sub_G = G.subgraph(list(sub_prt.keys()))
-        #     new_division = self.sub_divide(sub_G, sub_prt)
-        #     sub_groups.update({node: f"{prt}_{community}" for node, community in new_division.items()})
-        # # print(sub_groups)
-        # unique_sub_groups = set(sub_groups.values())
-        # new_mapping = dict(zip(unique_sub_groups, range(len(unique_sub_groups))))
-        # # print(new_mapping)
-        # flattenend_map = {node:new_mapping[sub_community] for node, sub_community in sub_groups.items()}
-        # resulting_map = flattenend_map
-        # print("OUTPUT")
-        # print(resulting_map)
         print(f"Number of changes {num_changes}")
         return resulting_map, num_changes
 

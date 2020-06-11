@@ -962,7 +962,7 @@ pos = nx.spring_layout(G)
 print("Generated network")
 init_pos = nx.spring_layout(G)
 louvain_algorithm = HierarchicalLabelPropagation(
-    fitness_function=map_equation_wrapper, verbose=False)
+    fitness_function=None, verbose=False)
 my_prt = louvain_algorithm.run(G)
 true_prt = community_louvain.best_partition(G)
 true_partition_map = community_louvain.best_partition(G)
@@ -1056,7 +1056,7 @@ visualize_benchmark_graph(G, init_pos, true_prt, ax[-1])
 # # G = nx.generators.erdos_renyi_graph(10, 0.5)
 # # G = nx.generators.cubical_graph()
 # G = generator.planted_partition_graph(4, 50, p_in=0.9, p_out=0.3)
-G, pos = generate_benchmark_graph(250,0.3)
+G, pos = generate_benchmark_graph(250,0.2)
 pos = nx.spring_layout(G)
 import pquality
 import pquality.PartitionQuality as pq
@@ -1075,26 +1075,16 @@ def conductance_wrapper(partition_map, G):
     partition_edges = defaultdict(float)
     partition_nodes = defaultdict(float)
     node_edges = {}
-    # print(partitions)
     for node, community in partition_map.items():
         node_edges[node] = sum(True for adj_node in G[node] if partition_map[adj_node] != community)
         partition_nodes[community] += int(node_edges[node])
         partition_edges[community] += int(len(G[node])) - int(node_edges[node])
-        # print(community, int(node_edges[node]))
 
-    # print(node_edges)
     cs = np.array(list(partition_nodes.values()))
     ms = np.array(list(partition_edges.values()))
-    # print(partition_nodes)
-    # print(partition_edges)
-    # print(cs)
-    # print(ms)
-    
 
-    # print(partition_degrees)
     fraction = cs/((ms)+cs)
-    # print(fraction)
-    # plt.plot(sorted(fraction))
+
     return -fraction.mean()
 
 print(conductance_wrapper(true_partition_map, G))
