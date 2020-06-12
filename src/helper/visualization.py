@@ -47,7 +47,7 @@ def show_reduction(algorithm, tmp_G, true_map, iterations=5):
     ax[0][0].set_title(f"Start: {normalized_mutual_information(partition_map, true_map)}", fontsize=10)
     ax[0][0].set_axis_off()
     visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][0])
-    
+
     for idx in range(1, iterations):
         partition_map, fitness = algorithm.local_movement(tmp_G, partition_map)
         # print(algorithm.stats["cooccurence_matrices"][-1])
@@ -65,6 +65,26 @@ def show_reduction(algorithm, tmp_G, true_map, iterations=5):
     ax[0][1].set_title(f"End: {normalized_mutual_information(true_map, true_map)}", fontsize=10)
     ax[0][1].set_axis_off()
     visualize_benchmark_graph(init_G, pos, true_map, ax=ax[0][1])
+
+
+def show_intermediate_results(algorithm, G, true_map):
+    # partition_map = dict(enumerate(tmp_G.nodes()))
+    number_of_reductions = len(algorithm.levels)
+    pos = nx.spring_layout(G)
+
+    if number_of_reductions <= 1:
+        backtracked_map = algorithm.decode_partition_map(number_of_reductions)
+        visualize_benchmark_graph(G, pos, backtracked_map)
+        return
+
+    fig, ax = plt.subplots(number_of_reductions, 1)
+    fig.set_size_inches(5, 10 * number_of_reductions)
+    for idx in range(0, number_of_reductions):
+        backtracked_map = algorithm.decode_partition_map(idx)
+        ax[idx].set_title(f"Level {idx}: {normalized_mutual_information(backtracked_map, true_map)}", fontsize=10)
+        ax[idx].set_axis_off()
+        visualize_benchmark_graph(G, pos, backtracked_map, ax=ax[idx])
+    return
 
 
 def draw_plots(data):

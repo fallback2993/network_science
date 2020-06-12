@@ -33,16 +33,18 @@ log_file_2 = io.open("log2.txt", "w")
 class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
     walk_length = None
     level_word_vectors = None
+    mode = None
 
-    def __init__(self, max_iter=20, fitness_function=community_louvain.modularity, verbose=False, max_local_movements=100, stop_after=-1, walk_length=int(1e5)):
+    def __init__(self, max_iter=20, fitness_function=community_louvain.modularity, verbose=False, max_local_movements=100, mode=-1, walk_length=int(1e5)):
         self.walk_length = walk_length
-        super().__init__(max_iter=max_iter, fitness_function=fitness_function, verbose=verbose, max_local_movements=max_local_movements, stop_after=stop_after)
+        self.mode = mode
+        super().__init__(max_iter=max_iter, fitness_function=fitness_function, verbose=verbose, max_local_movements=max_local_movements)
 
     def initialize(self, G):
         initial_partition_map = dict(enumerate(G.nodes()))
         self.levels = []
         self.level_word_vectors = []
-        self.stats = {"local_moving": [], "cooccurence_matrices": [], "partision_diff_sums":[]}
+        self.stats = {"local_moving": [], "cooccurence_matrices": [], "partision_diff_sums": []}
         self.levels.append(initial_partition_map)
         # initial_fitness = self.fitness_function(initial_partition_map, G)
         # self.null_fitness.append(initial_fitness)
@@ -65,11 +67,38 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
         id2comm = dict(enumerate(comm2id.keys()))
         # partition_matrix = np.zeros((num_nodes, num_partitions))
         partition_map_copy = {node2id[node]: comm2id[community] for node, community in partition_map.items()}
+        resulting_map = partition_map_copy.copy()
+
         G = nx.relabel_nodes(G, node2id)
 
         # initial_labels = np.array(list(partition_map.values()))
 
         word_vectors = self.level_word_vectors[-1]
+        last_diff = -1
+        # initial run
+        if self.mode == 0:
+            random_node_order = np.random.permutation(list(partition_map_copy.keys()))
+            for node_idx in random_node_order:
+                adj_nodes = list(G[node_idx])
+                distances = [(adj_node, torch.dist(word_vectors[node_idx], word_vectors[adj_node]), partition_map_copy[adj_node]) for adj_node in adj_nodes]
+                closest_node = min(distances, key=operator.itemgetter(1))
+                closest_node_idx, node_distance, new_prt = closest_node
+                partition_map_copy[node_idx] = new_prt
+        elif self.mode == 1:
+            random_node_order = np.random.permutation(list(partition_map_copy.keys()))
+            for node_idx in random_node_order:
+                adj_nodes = list(G[node_idx])
+                distances = [(adj_node, torch.dist(word_vectors[node_idx], word_vectors[adj_node]), partition_map_copy[adj_node]) for adj_node in adj_nodes]
+                closest_node = max(distances, key=operator.itemgetter(1))
+                closest_node_idx, node_distance, new_prt = closest_node
+                partition_map_copy[node_idx] = new_prt
+        elif self.mode == 2:
+            random_node_order = np.random.permutation(list(partition_map_copy.keys()))
+            for node_idx in random_node_order:
+                adj_node = np.random.choice(list(G[node_idx]))
+                new_prt = partition_map_copy[adj_node]
+                partition_map_copy[node_idx] = new_prt
+
 
         nodes = list(G.nodes())
         partition_gains = defaultdict(float)
@@ -89,7 +118,7 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 # print("")
                 # print(f"----{node_idx}----")
                 prt_candidates = set(partition_map_copy[adj_node] for adj_node in list(G[node_idx])
-                                     #  if partition_map_copy[adj_node] != curr_prt
+                                    #   if partition_map_copy[adj_node] != curr_prt
                                      )
 
                 empty_community = next(iter(set(range(min(current_communities), max(current_communities) + 2)) - set(current_communities)))
@@ -147,7 +176,6 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
                 # print(expected_sum_of_gains - prev_sum_gains)
 
-
                 log_file.write(
                     f"Node: {node_idx:>3} | Prt: {curr_prt:>3} -> {new_prt:>3} | {abs_gain:>5.10f} = {receiver_gain:>.10f} * {giver_gain:>.10f} / {receiver_normalizer:>3}\n")
                 partition_map_copy[node_idx] = new_prt
@@ -178,16 +206,28 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 }
                 self.stats["local_moving"].append(data_point)
                 num_changes += 1
-
-            resulting_map = partition_map_copy.copy()
-            print(f"Number of partitions is {len(set(partition_map_copy.values()))} -> sum {curr_overall_differences - prev_iteration_sum}")
-            if np.abs(curr_overall_differences - prev_iteration_sum) < .000001:
-                print(f"BREAK: Difference is: {curr_overall_differences - prev_iteration_sum}")
+            num_remaining_partitions = len(set(partition_map_copy.values()))
+            # resulting_map = 
+            iter_diff = curr_overall_differences - prev_iteration_sum
+            print(f"Num Partitions {num_remaining_partitions} | Sum {curr_overall_differences} | Diff {np.abs(iter_diff)} | Last {np.abs(last_diff - iter_diff)}")
+            if np.abs(last_diff - iter_diff) < 0.0001:
+                print(f"BREAK: No difference from last run: {last_diff}:{iter_diff}")
+                # resulting_map = partition_map_copy.copy()
                 break
+            if num_remaining_partitions == 1:
+                print(f"BREAK: Only one partition remained: {num_remaining_partitions}")
+                resulting_map = partition_map
+                break
+            # if np.abs(iter_diff) < .1:
+            #     print(f"BREAK: Difference is: {iter_diff} | Abs: {np.abs(iter_diff)}")
+            #     resulting_map = partition_map_copy.copy()
+            #     break
+            resulting_map = partition_map_copy.copy()
             prev_iteration_sum = curr_overall_differences
+            last_diff = np.abs(iter_diff)
 
             cnt += 1
-            # if 
+            # if
             if cnt >= self.max_iter:
                 print(f"Max iteration reached: {cnt}")
                 break
@@ -198,8 +238,7 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
         print(f"Number of changes {num_changes}")
 
         self.rebuild_word_vectors(resulting_map, word_vectors)
-
-        return resulting_map, num_changes
+        return resulting_map, curr_overall_differences
 
     def choose_right_candidate(self, change_candidates, partition_differences):
         pass
