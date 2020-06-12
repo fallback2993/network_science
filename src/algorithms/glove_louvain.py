@@ -87,7 +87,7 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 # print("")
                 # print(f"----{node_idx}----")
                 prt_candidates = set(partition_map_copy[adj_node] for adj_node in list(G[node_idx])
-                                    #  if partition_map_copy[adj_node] != curr_prt
+                                     #  if partition_map_copy[adj_node] != curr_prt
                                      )
 
                 empty_community = next(iter(set(range(min(current_communities), max(current_communities) + 2)) - set(current_communities)))
@@ -119,12 +119,14 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                     if receiver_normalizer == 0:
                         receiver_normalizer = 1
 
-                    change_candidates.append((prt_candidate, (receiver_gain * giver_gain / receiver_normalizer), receiver_gain, giver_gain, receiver_normalizer))
+                    change_gain = (receiver_gain * giver_gain / receiver_normalizer)
+                    difference_increase = np.sum(list(partition_gains.values())) - giver_gain + receiver_gain
+                    change_candidates.append((prt_candidate, change_gain, receiver_gain, giver_gain, receiver_normalizer, change_gain / difference_increase))
 
                 choose = 1
                 maximum_gain = max(change_candidates, key=operator.itemgetter(choose))
 
-                new_prt, abs_gain, receiver_gain, giver_gain, receiver_normalizer = maximum_gain
+                new_prt, abs_gain, receiver_gain, giver_gain, receiver_normalizer, difference_increase = maximum_gain
 
                 partition_gains[curr_prt] -= giver_gain
                 partition_gains[new_prt] += receiver_gain
@@ -141,7 +143,8 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 # print(f"Node {node_idx} to partition {prt_candidate}: {change_score:.8f} = {candidate_avg_diff:.8f} - {candidate_avg_diff_with_change:.8f}")
                 # print(expected_sum_of_gains - prev_sum_gains)
 
-                log_file.write(f"Node: {node_idx:>3} | Prt: {curr_prt:>3} -> {new_prt:>3} | {abs_gain:>5.10f} = {receiver_gain:>.10f} * {giver_gain:>.10f} / {receiver_normalizer:>3}\n")
+                log_file.write(
+                    f"Node: {node_idx:>3} | Prt: {curr_prt:>3} -> {new_prt:>3} | {abs_gain:>5.10f} = {receiver_gain:>.10f} * {giver_gain:>.10f} / {receiver_normalizer:>3}\n")
                 partition_map_copy[node_idx] = new_prt
                 rollier.append(abs_gain)
                 rolling_mean = np.mean(rollier)
@@ -161,9 +164,6 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
                 self.stats["local_moving"].append(data_point)
                 num_changes += 1
 
-            # if expected_sum_of_gains - prev_sum_gains > 0.1:
-            #     print(f"BREAK: Difference is: {expected_sum_of_gains - prev_sum_gains}")
-            #     break
             resulting_map = partition_map_copy.copy()
             prev_sum_gains = expected_sum_of_gains
             print(f"Number of partitions is {len(set(partition_map_copy.values()))} -> sum {expected_sum_of_gains}")
@@ -172,6 +172,9 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
             if cnt >= self.max_iter:
                 print(f"Max iteration reached: {cnt}")
                 break
+            # if expected_sum_of_gains - prev_sum_gains > 1:
+            #     print(f"BREAK: Difference is: {expected_sum_of_gains - prev_sum_gains}")
+            #     break
 
         comm2id = dict({community: idx for idx, community in enumerate(set(resulting_map.values()))})
         resulting_map = {id2node[node]: comm2id[community] for node, community in resulting_map.items()}
@@ -181,6 +184,9 @@ class GloveMaximizationAlgorithm(LouvainCoreAlgorithm):
         self.rebuild_word_vectors(resulting_map, word_vectors)
 
         return resulting_map, num_changes
+
+    def choose_right_candidate(self, change_candidates, partition_differences):
+        pass
 
     def rebuild_word_vectors(self, partition_map, word_vectors):
         communities = set(partition_map.values())
