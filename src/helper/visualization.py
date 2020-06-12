@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import matplotlib.cm as cm
 import math
+from helper.utils import normalized_mutual_information
 
 
 def visualize_benchmark_graph(G, pos, partition=None, ax=None):
@@ -34,6 +35,36 @@ def show_all_identified_partitions(G, pos, partition):
         ax.set_title(f"Partition {prt_id}")
         show_subset(prt_id, partition, G, pos, ax)
     return plt.tight_layout()
+
+
+def show_reduction(algorithm, tmp_G, true_map, iterations=5):
+    init_G, partition_map = algorithm.initialize(G=tmp_G)
+    # partition_map = dict(enumerate(tmp_G.nodes()))
+    pos = nx.spring_layout(tmp_G)
+    fig, ax = plt.subplots(iterations, 2)
+    fig.set_size_inches(10, 10)
+    # VERBOSE = True
+    ax[0][0].set_title(f"Start: {normalized_mutual_information(partition_map, true_map)}", fontsize=10)
+    ax[0][0].set_axis_off()
+    visualize_benchmark_graph(tmp_G, pos, partition_map, ax=ax[0][0])
+    
+    for idx in range(1, iterations):
+        partition_map, fitness = algorithm.local_movement(tmp_G, partition_map)
+        # print(algorithm.stats["cooccurence_matrices"][-1])
+        algorithm.levels.append(partition_map)
+        tmp_G, partition_map = algorithm.reduce_network(tmp_G, partition_map)
+        ax[idx][0].set_title("Reduced map", fontsize=10)
+        ax[idx][0].set_axis_off()
+        visualize_benchmark_graph(tmp_G, nx.spring_layout(pos), partition_map, ax=ax[idx][0])
+
+        backtracked_map = algorithm.decode_partition_map(len(algorithm.levels) - 1)
+        ax[idx][1].set_title(normalized_mutual_information(backtracked_map, true_map), fontsize=10)
+        ax[idx][1].set_axis_off()
+        visualize_benchmark_graph(init_G, pos, backtracked_map, ax=ax[idx][1])
+
+    ax[0][1].set_title(f"End: {normalized_mutual_information(true_map, true_map)}", fontsize=10)
+    ax[0][1].set_axis_off()
+    visualize_benchmark_graph(init_G, pos, true_map, ax=ax[0][1])
 
 
 def draw_plots(data):

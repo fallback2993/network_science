@@ -17,16 +17,19 @@ import pickle
 if __name__ == "__main__":
     G, pos = utils.generate_benchmark_graph(250, 0.1)
     pos = nx.spring_layout(G)
-    algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=True)
-    partition = algorithm.run(G)
+    algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=False)
+    # partition = algorithm.run(G)
     # partition = community_louvain.best_partition(G)
+    true_partition, true_community = utils.extract_true_communities(G)
     # %%
-    viz.visualize_benchmark_graph(G, pos, partition)
-    plt.show()
+    # viz.visualize_benchmark_graph(G, pos, partition)
+    # plt.show()
     # %%
-    viz.show_all_identified_partitions(G, pos, partition)
-    plt.show()
+    # viz.show_all_identified_partitions(G, pos, partition)
+    # plt.show()
     # pickle.dump(algorithm, "last_run.pkl")
-
+    # %%
+    viz.show_reduction(algorithm, G, true_partition)
+    plt.show()
 
 # %%
