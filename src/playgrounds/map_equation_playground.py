@@ -12,8 +12,8 @@ if __name__ == "__main__":
     from helper.visualization import visualize_benchmark_graph
     import matplotlib.pyplot as plt
 
-    G = nx.karate_club_graph()
-    # G = nx.barbell_graph(4, 1)
+    # G = nx.karate_club_graph()
+    G = nx.barbell_graph(4, 1)
     # G = nx.bull_graph()
     # G = nx.generators.erdos_renyi_graph(10, 0.5)
     # G = nx.generators.cubical_graph()
@@ -41,6 +41,9 @@ if __name__ == "__main__":
     # infomap_partition = dict(sorted(result.items()))
 
     codelength, index_codelength, module_codelength = map_equation(G, infomap_partition)
+    print("")
+    print("------------------")
+    print("")
     codelength_, index_codelength_, module_codelength_ = map_equation_improved(G, infomap_partition, False)
 
     print("")

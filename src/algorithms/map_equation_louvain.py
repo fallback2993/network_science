@@ -1,5 +1,5 @@
 from algorithms.louvain_core import LouvainCoreAlgorithm
-from algorithms.map_equation import map_equation_essentials
+from algorithms.map_equation import map_equation_essentials, compute_minimal_codelength
 import numpy as np
 
 
@@ -33,6 +33,8 @@ class MapEquationMaximization(LouvainCoreAlgorithm):
             for node in random_order:
                 for adj in G[node]:
                     tmp_q_a_i = p_a_i.copy() # partition_probabilities
+                    tmp_q_out_i = q_out_i.copy() # module transition probabilities
+                    new_L = compute_minimal_codelength()
                     giving_partition_probability = compute_partition_probability(partition_map[node], p_u, partition_map) - p_u[node]
                     receiving_partition_probability = compute_partition_probability(partition_map[node], p_u, partition_map) + p_u[node]
                     # old_
