@@ -104,7 +104,7 @@ def map_equation(G, partition_map):
     q_out = q_out_i.sum()
     p_circle_i = p_a_i + q_out_i
 
-    print(p_a_i, "\n", q_out_i, "\n", q_out, "\n", p_circle_i, "\n", p_u, "\n")
+    # print(p_a_i, "\n", q_out_i, "\n", q_out, "\n", p_circle_i, "\n", p_u, "\n")
 
     H_Q = -sum(np.nan_to_num((q_out_i / q_out) * np.log2(q_out_i / q_out)))
     term1 = -np.nan_to_num((q_out_i / p_circle_i) * np.log2((q_out_i / p_circle_i)))
@@ -113,8 +113,8 @@ def map_equation(G, partition_map):
         term2[name] = -compute_weighted_entropy(p_u[community], p_circle_i[name])
 
     H_P_i = term1 + term2
-    print(community_map)
-    print(H_P_i, "\n", H_Q, "\n", q_out, "\n", p_circle_i, "\n", term1, "\n", term2, "\n", p_u, "\n")
+    # print(community_map)
+    # print(H_P_i, "\n", H_Q, "\n", q_out, "\n", p_circle_i, "\n", term1, "\n", term2, "\n", p_u, "\n")
 
     index_codelength = q_out * H_Q
     module_codelength = p_circle_i.dot(H_P_i)
@@ -158,7 +158,7 @@ def compute_weighted_entropy(probs, normalizer):
 
 
 def map_equation_essentials(G, partition_map, DEBUG=False):
-    print("")
+    # print("")
     # node2id = dict({node: idx for idx, node in enumerate(set(G))})
 
     A = np.array(nx.adjacency_matrix(G).todense())
@@ -231,7 +231,7 @@ def retrieve_linkings(node_partition_in_links, node_partition_ex_links, node_wei
     q_out = q_out_i.sum()
     p_circle_i = p_a_i + q_out_i
 
-    print(p_a_i, "\n", q_out_i, "\n", q_out, "\n", p_circle_i, "\n", p_u, "\n")
+    # print(p_a_i, "\n", q_out_i, "\n", q_out, "\n", p_circle_i, "\n", p_u, "\n")
     return p_a_i, q_out_i, q_out, p_circle_i, p_u
 
 
@@ -243,14 +243,12 @@ def compute_minimal_codelength(p_a_i, q_out_i, q_out, p_circle_i, p_u, partition
 
     for node_weight, community in zip(p_u, partition_mapping):
         community = int(community)
-        term2[community] += node_weight/p_circle_i[community] * np.log2(node_weight/p_circle_i[community]) if node_weight != 0 else 0
-    # for name, community in community_map.items():
-    #     term2[name] = -compute_weighted_entropy(p_u[community], p_circle_i[name])
+        term2[community] += node_weight / p_circle_i[community] * np.log2(node_weight / p_circle_i[community]) if node_weight != 0 else 0
 
     H_P_i = term1 - term2
 
-    print(partition_mapping)
-    print(H_P_i, "\n", H_Q, "\n", q_out, "\n", p_circle_i, "\n", term1, "\n", term2, "\n", p_u, "\n")
+    # print(partition_mapping)
+    # print(H_P_i, "\n", H_Q, "\n", q_out, "\n", p_circle_i, "\n", term1, "\n", term2, "\n", p_u, "\n")
 
     index_codelength = q_out * H_Q
     module_codelength = p_circle_i.dot(H_P_i)

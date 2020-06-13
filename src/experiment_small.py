@@ -18,13 +18,13 @@ import pickle
 
 # %%
 if __name__ == "__main__":
-    G, pos = utils.generate_benchmark_graph(1000, 0.1)
+    G, pos = utils.generate_benchmark_graph(250, 0.1)
     pos = nx.spring_layout(G)
-    algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=False, max_iter=50, mode=-1)
+    # algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=False, max_iter=50, mode=-1)
     # algorithm = HierarchicalLabelPropagation(fitness_function=None, verbose=False, max_iter=50)
     # algorithm = RandomPropagation(fitness_function=None, verbose=False, max_iter=50)
     # algorithm = LouvainCoreAlgorithm(fitness_function=qfunctions.random_wrapper, verbose=False, max_iter=50)
-    # algorithm = MapEquationMaximization(fitness_function=None, max_iter=50)
+    algorithm = MapEquationMaximization(fitness_function=None, max_iter=50)
     true_partition, true_community = utils.extract_true_communities(G)
     partition = algorithm.run(G)
     # # partition = community_louvain.best_partition(G)
