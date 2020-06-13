@@ -8,6 +8,7 @@ from algorithms.louvain_core import LouvainCoreAlgorithm
 from algorithms.glove_louvain import GloveMaximizationAlgorithm
 from algorithms.label_propagation_louvain import HierarchicalLabelPropagation
 from algorithms.random_louvain import RandomPropagation
+from algorithms.map_equation_louvain import MapEquationMaximization
 import community as community_louvain
 from networkx.algorithms import community as algorithms
 import itertools
@@ -17,12 +18,13 @@ import pickle
 
 # %%
 if __name__ == "__main__":
-    G, pos = utils.generate_benchmark_graph(500, 0.1)
+    G, pos = utils.generate_benchmark_graph(1000, 0.1)
     pos = nx.spring_layout(G)
-    # algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=False, max_iter=50, mode=-1)
-    algorithm = HierarchicalLabelPropagation(fitness_function=None, verbose=False, max_iter=50)
-    algorithm = RandomPropagation(fitness_function=None, verbose=False, max_iter=50)
+    algorithm = GloveMaximizationAlgorithm(fitness_function=None, verbose=False, max_iter=50, mode=-1)
+    # algorithm = HierarchicalLabelPropagation(fitness_function=None, verbose=False, max_iter=50)
+    # algorithm = RandomPropagation(fitness_function=None, verbose=False, max_iter=50)
     # algorithm = LouvainCoreAlgorithm(fitness_function=qfunctions.random_wrapper, verbose=False, max_iter=50)
+    # algorithm = MapEquationMaximization(fitness_function=None, max_iter=50)
     true_partition, true_community = utils.extract_true_communities(G)
     partition = algorithm.run(G)
     # # partition = community_louvain.best_partition(G)

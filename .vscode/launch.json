@@ -12,6 +12,13 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Python: ME",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/playgrounds/map_equation_playground.py",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python: big",
             "type": "python",
             "request": "launch",
